@@ -1,9 +1,13 @@
 use crate::junction::{ContactPoint, ElementDir};
 use crate::road::geometry::PlanView;
+use crate::road::lane::Lanes;
+use crate::road::profile::{ElevationProfile, LateralProfile};
 use serde_derive::{Deserialize, Serialize};
 use uom::si::f64::Length;
 
 mod geometry;
+mod lane;
+mod profile;
 
 /// In ASAM OpenDRIVE, the road network is represented by `<road>` elements. Each road runs along
 /// one road reference line. A road shall have at least one lane with a width larger than 0.
@@ -34,11 +38,11 @@ pub struct Road {
     pub link: Option<Link>,
     #[serde(rename = "planView")]
     pub plan_view: Vec<PlanView>,
-    // #[serde(rename = "elevationProfile")]
-    // pub elevation_profile: Option<()>,
-    // #[serde(rename = "lateralProfile")]
-    // pub lateral_profile: Option<()>,
-    // pub lanes: (),
+    #[serde(rename = "elevationProfile")]
+    pub elevation_profile: Option<ElevationProfile>,
+    #[serde(rename = "lateralProfile")]
+    pub lateral_profile: Option<LateralProfile>,
+    pub lanes: Lanes,
     // pub objects: (),
     // pub signals: (),
     // pub surface: (),
