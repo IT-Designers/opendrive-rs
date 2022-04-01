@@ -1,6 +1,5 @@
 use crate::road::Road;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use serde_derive::{Deserialize, Serialize};
 use std::str::FromStr;
 use uom::si::angle::radian;
 use uom::si::f64::{Angle, Length};
@@ -11,13 +10,10 @@ use xml::EventReader;
 
 pub mod additional_data;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename = "OpenDRIVE")]
+#[derive(Debug, Clone)]
 pub struct OpenDrive {
-    #[serde(default = "OpenDrive::default_xmlns")]
     pub xmlns: String,
     pub header: Header,
-    #[serde(rename = "road", default = "Vec::new")]
     pub roads: Vec<Road>,
 }
 
@@ -84,12 +80,10 @@ impl OpenDrive {
 }
 
 /// The `<header>` element is the very first element within the `<OpenDRIVE>` element.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Header {
-    #[serde(rename = "revMajor")]
     pub rev_major: u16,
-    #[serde(rename = "revMinor")]
-    rev_minor: u16,
+    pub rev_minor: u16,
     pub name: Option<String>,
     pub version: Option<String>,
     pub date: Option<String>,
@@ -196,7 +190,7 @@ impl Header {
 /// it may contain characters that interfere with the XML syntax of an element’s attribute.
 /// In ASAM OpenDRIVE, the information about the geographic reference of an ASAM OpenDRIVE dataset
 /// is represented by the `<geoReference>` element within the `<header>` element.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct GeoReference {
     // TODO pub additional_data: Vec<AdditionalData>,
 }
@@ -217,7 +211,7 @@ impl GeoReference {
 /// translated by @x, @y, and @z. Afterwards, it is rotated by @hdg around the new origin. Rotation
 /// around the z-axis should be avoided. In ASAM OpenDRIVE, the offset of a database is represented
 /// by the `<offset>` element within the `<header>` element.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default)]
 pub struct Offset {
     /// Heading offset (rotation around resulting z-axis)
     pub hdg: Angle,

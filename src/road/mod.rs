@@ -2,7 +2,6 @@ use crate::junction::{ContactPoint, ElementDir};
 use crate::road::geometry::PlanView;
 use crate::road::lane::Lanes;
 use crate::road::profile::{ElevationProfile, LateralProfile};
-use serde_derive::{Deserialize, Serialize};
 use std::str::FromStr;
 use uom::si::f64::Length;
 use uom::si::length::meter;
@@ -23,7 +22,7 @@ pub mod profile;
 /// element may cover a long stretch of a road, shorter stretches between junctions, or even several
 /// roads. A new `<road>` element should only start if the properties of the road cannot be
 /// described within the previous `<road>` element or if a junction is required.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Road {
     /// Unique ID within the database. If it represents an integer number, it should comply to
     /// `uint32_t` and stay within the given range.
@@ -40,11 +39,8 @@ pub struct Road {
     /// attribute is missing, RHT is assumed.
     pub rule: Option<Rule>,
     pub link: Option<Link>,
-    #[serde(rename = "planView")]
     pub plan_view: PlanView,
-    #[serde(rename = "elevationProfile")]
     pub elevation_profile: Option<ElevationProfile>,
-    #[serde(rename = "lateralProfile")]
     pub lateral_profile: Option<LateralProfile>,
     pub lanes: Lanes,
     // pub objects: (),
@@ -104,7 +100,7 @@ impl Road {
 
 /// Follows the road header if the road is linked to a successor or a predecessor. Isolated roads
 /// may omit this element.
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone)]
 pub struct Link {
     pub predecessor: Option<PredecessorSuccessor>,
     pub successor: Option<PredecessorSuccessor>,
@@ -135,25 +131,20 @@ impl Link {
 
 /// Successors and predecessors can be junctions or roads. For each, different attribute sets shall
 /// be used.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct PredecessorSuccessor {
     /// Contact point of link on the linked element
-    #[serde(rename = "contactPoint")]
     pub contact_point: Option<ContactPoint>,
     /// To be provided when elementS is used for the connection definition. Indicates the direction
     /// on the predecessor from which the road is entered.
-    #[serde(rename = "elementDir")]
     pub element_dir: Option<ElementDir>,
     /// ID of the linked element
-    #[serde(rename = "elementId")]
     pub element_id: String,
     /// Alternative to contactPoint for virtual junctions. Indicates a connection within the
     /// predecessor, meaning not at the start or end of the predecessor. Shall only be used for
     /// elementType "road"
-    #[serde(rename = "elementS")]
     pub element_s: Option<Length>,
     /// Type of the linked element
-    #[serde(rename = "elementType")]
     pub element_type: Option<ElementType>,
 }
 
@@ -174,11 +165,9 @@ impl PredecessorSuccessor {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub enum ElementType {
-    #[serde(rename = "road")]
     Road,
-    #[serde(rename = "junction")]
     Junction,
 }
 
@@ -194,11 +183,9 @@ impl FromStr for ElementType {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub enum Rule {
-    #[serde(rename = "RHT")]
     RightHandTraffic,
-    #[serde(rename = "LHT")]
     LeftHandTraffic,
 }
 

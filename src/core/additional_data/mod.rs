@@ -1,17 +1,12 @@
-use serde_derive::{Deserialize, Serialize};
-
 pub mod data_quality;
 
 /// ASAM OpenDRIVE offers the possibility to include external data. The processing of this data
 /// depends on the application.
 /// Additional data may be placed at any position in ASAM OpenDRIVE.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub enum AdditionalData {
-    #[serde(rename = "dataQuality")]
     DataQuality(data_quality::DataQuality),
-    #[serde(rename = "include")]
     Include(Vec<Include>),
-    #[serde(rename = "userData")]
     UserData(Vec<UserData>),
 }
 
@@ -19,7 +14,7 @@ pub enum AdditionalData {
 /// the files depends on the application.
 /// Included data is represented by `<include>` elements. They may be stored at any position in ASAM
 /// OpenDRIVE.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Include {
     /// Location of the file that is to be included
     pub file: String,
@@ -30,7 +25,7 @@ pub struct Include {
 /// specific reason. Examples are different road textures.
 /// In ASAM OpenDRIVE, ancillary data is represented by `<userData>` elements. They may be stored at
 /// any element in ASAM OpenDRIVE.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct UserData {
     /// Code for the user data. Free text, depending on application.
     pub code: String,

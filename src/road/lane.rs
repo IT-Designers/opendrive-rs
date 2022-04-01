@@ -1,5 +1,3 @@
-use serde_aux::field_attributes::deserialize_number_from_string;
-use serde_derive::{Deserialize, Serialize};
 use uom::si::f64::Length;
 use uom::si::length::meter;
 use xml::attribute::OwnedAttribute;
@@ -9,11 +7,9 @@ pub mod mark;
 
 /// Contains a series of lane section elements that define the characteristics of the road cross
 /// sections with respect to the lanes along the reference line.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Lanes {
-    #[serde(rename = "laneOffset", default = "Vec::new")]
     pub lane_offset: Vec<Offset>,
-    #[serde(rename = "laneSection", default = "Vec::new")]
     pub lane_section: Vec<Section>,
 }
 
@@ -45,7 +41,7 @@ impl Lanes {
 }
 
 /// A lane offset may be used to shift the center lane away from the road reference line.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Offset {
     /// Polynom parameter a, offset at @s (ds=0)
     pub a: f64,
@@ -78,13 +74,12 @@ impl Offset {
 /// Lanes may be split into multiple lane sections. Each lane section contains a fixed number of
 /// lanes. Every time the number of lanes changes, a new lane section is required. The distance
 /// between two succeeding lane sections shall not be zero.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Section {
     /// s-coordinate of start position
     pub s: f64,
     /// Lane section element is valid for one side only (left, center, or right), depending on the
     /// child elements.
-    #[serde(rename = "singleSide")]
     pub single_side: Option<bool>,
     pub left: Option<Left>,
     pub center: Center,
@@ -129,7 +124,7 @@ impl Section {
 /// For easier navigation through an ASAM OpenDRIVE road description, the lanes within a lane
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Left {
     pub lane: Vec<LeftLane>,
 }
@@ -155,11 +150,10 @@ impl Left {
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
 /// lanes from left to right, that is, with descending ID.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct LeftLane {
     /// ID of the lane
     pub id: i64,
-    #[serde(flatten)]
     pub base: Lane,
 }
 
@@ -178,7 +172,7 @@ impl LeftLane {
 /// For easier navigation through an ASAM OpenDRIVE road description, the lanes within a lane
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Center {
     pub lane: Vec<CenterLane>,
 }
@@ -204,11 +198,10 @@ impl Center {
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
 /// lanes from left to right, that is, with descending ID.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct CenterLane {
     /// ID of the lane
     pub id: i64,
-    #[serde(flatten)]
     pub base: Lane,
 }
 
@@ -227,7 +220,7 @@ impl CenterLane {
 /// For easier navigation through an ASAM OpenDRIVE road description, the lanes within a lane
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Right {
     pub lane: Vec<RightLane>,
 }
@@ -253,11 +246,10 @@ impl Right {
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
 /// lanes from left to right, that is, with descending ID.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct RightLane {
     /// ID of the lane
     pub id: i64,
-    #[serde(flatten)]
     pub base: Lane,
 }
 
@@ -275,25 +267,17 @@ impl RightLane {
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
 /// lanes from left to right, that is, with descending ID.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Lane {
     pub link: Option<LaneLink>,
-    // #[serde(flatten, default = "Vec::new")]
-    #[serde(rename = "$value", default = "Vec::new")]
     pub choice: Vec<LaneChoice>,
-    // #[serde(flatten, rename = "roadMark", default = "Vec::new")]
     // pub road_mark: Vec<RoadMark>,
     // TODO
-    // #[serde(default = "Vec::new")]
-    // pub material: Vec<Material>, // TODO
-    // #[serde(default = "Vec::new")]
-    // pub speed: Vec<Speed>, // TODO
-    // #[serde(default = "Vec::new")]
-    // pub access: Vec<Access>, // TODO
-    // #[serde(default = "Vec::new")]
-    // pub height: Vec<Height>, // TODO
-    // #[serde(default = "Vec::new")]
-    // pub rule: Vec<Rule>, // TODO
+    //     // pub material: Vec<Material>, // TODO
+    //     // pub speed: Vec<Speed>, // TODO
+    //     // pub access: Vec<Access>, // TODO
+    //     // pub height: Vec<Height>, // TODO
+    //     // pub rule: Vec<Rule>, // TODO
 }
 
 impl Lane {
@@ -330,12 +314,10 @@ impl Lane {
 /// information provide the IDs of lanes on the first or last lane section of the other reference
 /// line depending on the contact point of the road linkage.
 /// This element may only be omitted, if lanes end at a junction or have no physical link.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct LaneLink {
-    #[serde(default = "Vec::new")]
-    predecessor: Vec<PredecessorSuccessor>,
-    #[serde(default = "Vec::new")]
-    successor: Vec<PredecessorSuccessor>,
+    pub predecessor: Vec<PredecessorSuccessor>,
+    pub successor: Vec<PredecessorSuccessor>,
 }
 
 impl LaneLink {
@@ -365,10 +347,10 @@ impl LaneLink {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct PredecessorSuccessor {
     /// ID of the preceding / succeeding linked lane
-    id: i64,
+    pub id: i64,
 }
 
 impl PredecessorSuccessor {
@@ -383,11 +365,9 @@ impl PredecessorSuccessor {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub enum LaneChoice {
-    #[serde(rename = "border")]
     Border(Border),
-    #[serde(rename = "width")]
     Width(Width),
 }
 
@@ -402,29 +382,23 @@ pub enum LaneChoice {
 /// application shall use the information from the `<width>` elements.
 /// In ASAM OpenDRIVE, lane borders are represented by the `<border>` element within the `<lane>`
 /// element.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Border {
     /// Polynom parameter a, border position at @s (ds=0)
     // https://github.com/RReverser/serde-xml-rs/issues/137
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub a: f64,
     /// Polynom parameter b
     // https://github.com/RReverser/serde-xml-rs/issues/137
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub b: f64,
     /// Polynom parameter c
     // https://github.com/RReverser/serde-xml-rs/issues/137
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub c: f64,
     /// Polynom parameter d
     // https://github.com/RReverser/serde-xml-rs/issues/137
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub d: f64,
     /// s-coordinate of start position of the `<border>` element , relative to the position of the
     /// preceding `<laneSection>` element
     // https://github.com/RReverser/serde-xml-rs/issues/137
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    #[serde(rename = "sOffset")]
     pub s_offset: Length,
 }
 
@@ -450,29 +424,23 @@ impl Border {
 /// width and lane border elements are present for a lane section in the ASAM OpenDRIVE file, the
 /// application must use the information from the `<width>` elements.
 /// In ASAM OpenDRIVE, lane width is described by the `<width>` element within the `<lane>` element.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub struct Width {
     /// Polynom parameter a, width at @s (ds=0)
     // https://github.com/RReverser/serde-xml-rs/issues/137
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub a: f64,
     /// Polynom parameter b
     // https://github.com/RReverser/serde-xml-rs/issues/137
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub b: f64,
     /// Polynom parameter c
     // https://github.com/RReverser/serde-xml-rs/issues/137
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub c: f64,
     /// Polynom parameter d
     // https://github.com/RReverser/serde-xml-rs/issues/137
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub d: f64,
     /// s-coordinate of start position of the `<width>` element, relative to the position of the
     /// preceding `<laneSection>` element
     // https://github.com/RReverser/serde-xml-rs/issues/137
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    #[serde(rename = "sOffset")]
     pub s_offset: Length,
 }
 

@@ -1,19 +1,14 @@
-use serde_derive::{Deserialize, Serialize};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub enum ConnectionType {
-    #[serde(rename = "default")]
     Default,
-    #[serde(rename = "verticval")]
     Vertical,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub enum ContactPoint {
-    #[serde(rename = "start")]
     Start,
-    #[serde(rename = "end")]
     End,
 }
 
@@ -29,11 +24,9 @@ impl FromStr for ContactPoint {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub enum ElementDir {
-    #[serde(rename = "+")]
     Plus,
-    #[serde(rename = "-")]
     Minus,
 }
 
