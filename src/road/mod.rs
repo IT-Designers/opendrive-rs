@@ -3,11 +3,15 @@ use crate::road::geometry::PlanView;
 use crate::road::lane::Lanes;
 use crate::road::profile::{ElevationProfile, LateralProfile};
 use serde_derive::{Deserialize, Serialize};
+use std::str::FromStr;
 use uom::si::f64::Length;
+use uom::si::length::meter;
+use xml::attribute::OwnedAttribute;
+use xml::reader::XmlEvent;
 
-mod geometry;
-mod lane;
-mod profile;
+pub mod geometry;
+pub mod lane;
+pub mod profile;
 
 /// In ASAM OpenDRIVE, the road network is represented by `<road>` elements. Each road runs along
 /// one road reference line. A road shall have at least one lane with a width larger than 0.
@@ -37,7 +41,7 @@ pub struct Road {
     pub rule: Option<Rule>,
     pub link: Option<Link>,
     #[serde(rename = "planView")]
-    pub plan_view: Vec<PlanView>,
+    pub plan_view: PlanView,
     #[serde(rename = "elevationProfile")]
     pub elevation_profile: Option<ElevationProfile>,
     #[serde(rename = "lateralProfile")]
@@ -48,14 +52,85 @@ pub struct Road {
     // pub surface: (),
     // pub raildroad: (),
 }
+impl Road {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        let mut link = None;
+        let mut plan_view = None;
+        let mut elevation_profile = None;
+        let mut lateral_profile = None;
+        let mut lanes = None;
+
+        find_map_parse_elem!(
+            events,
+            "link" => |attributes| {
+                link = Some(Link::from_events(events, attributes)?);
+                Ok(())
+            },
+            "planView" true => |attributes| {
+                plan_view = Some(PlanView::from_events(events, attributes)?);
+                Ok(())
+            },
+            "elevationProfile" => |attributes| {
+                elevation_profile = Some(ElevationProfile::from_events(events, attributes)?);
+                Ok(())
+            },
+            "lateralProfile" => |attributes| {
+                lateral_profile = Some(LateralProfile::from_events(events, attributes)?);
+                Ok(())
+            },
+            "lanes" true => |attributes| {
+                lanes = Some(Lanes::from_events(events, attributes)?);
+                Ok(())
+            }
+        );
+
+        Ok(Self {
+            id: find_map_parse_attr!(attributes, "id", String)?,
+            junction: find_map_parse_attr!(attributes, "junction", String)?,
+            length: find_map_parse_attr!(attributes, "length", f64).map(Length::new::<meter>)?,
+            name: find_map_parse_attr!(attributes, "name", Option<String>)?,
+            rule: find_map_parse_attr!(attributes, "rule", Option<Rule>)?,
+            link,
+            plan_view: plan_view.unwrap(),
+            elevation_profile,
+            lateral_profile,
+            lanes: lanes.unwrap(),
+        })
+    }
+}
 
 /// Follows the road header if the road is linked to a successor or a predecessor. Isolated roads
 /// may omit this element.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct Link {
     pub predecessor: Option<PredecessorSuccessor>,
     pub successor: Option<PredecessorSuccessor>,
     // TODO pub additional_data: Vec<AdditionalData>,
+}
+impl Link {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        _attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        let mut this = Self::default();
+
+        find_map_parse_elem!(
+            events,
+            "predecessor" => |attributes| {
+                this.predecessor = Some(PredecessorSuccessor::from_events(events, attributes)?);
+                Ok(())
+            },
+            "successor" => |attributes| {
+                this.successor = Some(PredecessorSuccessor::from_events(events, attributes)?);
+                Ok(())
+            }
+        );
+
+        Ok(this)
+    }
 }
 
 /// Successors and predecessors can be junctions or roads. For each, different attribute sets shall
@@ -79,7 +154,24 @@ pub struct PredecessorSuccessor {
     pub element_s: Option<Length>,
     /// Type of the linked element
     #[serde(rename = "elementType")]
-    pub element_type: Vec<ElementType>,
+    pub element_type: Option<ElementType>,
+}
+
+impl PredecessorSuccessor {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        find_map_parse_elem!(events);
+        Ok(Self {
+            contact_point: find_map_parse_attr!(attributes, "contactPoint", Option<ContactPoint>)?,
+            element_dir: find_map_parse_attr!(attributes, "elementDir", Option<ElementDir>)?,
+            element_id: find_map_parse_attr!(attributes, "elementId", String)?,
+            element_s: find_map_parse_attr!(attributes, "elementS", Option<f64>)?
+                .map(Length::new::<meter>),
+            element_type: find_map_parse_attr!(attributes, "elementType", Option<ElementType>)?,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -90,10 +182,34 @@ pub enum ElementType {
     Junction,
 }
 
+impl FromStr for ElementType {
+    type Err = crate::parser::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            _ if s.eq_ignore_ascii_case("road") => Ok(Self::Road),
+            _ if s.eq_ignore_ascii_case("junction") => Ok(Self::Junction),
+            _ => Err(crate::parser::Error::invalid_value_for::<Self, _>(s)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Rule {
     #[serde(rename = "RHT")]
     RightHandTraffic,
     #[serde(rename = "LHT")]
     LeftHandTraffic,
+}
+
+impl FromStr for Rule {
+    type Err = crate::parser::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            _ if s.eq_ignore_ascii_case("LHT") => Ok(Self::LeftHandTraffic),
+            _ if s.eq_ignore_ascii_case("RHT") => Ok(Self::RightHandTraffic),
+            _ => Err(crate::parser::Error::invalid_value_for::<Self, _>(s)),
+        }
+    }
 }

@@ -1,6 +1,11 @@
 use serde_aux::field_attributes::deserialize_number_from_string;
 use serde_derive::{Deserialize, Serialize};
 use uom::si::f64::Length;
+use uom::si::length::meter;
+use xml::attribute::OwnedAttribute;
+use xml::reader::XmlEvent;
+
+pub mod mark;
 
 /// Contains a series of lane section elements that define the characteristics of the road cross
 /// sections with respect to the lanes along the reference line.
@@ -10,6 +15,33 @@ pub struct Lanes {
     pub lane_offset: Vec<Offset>,
     #[serde(rename = "laneSection", default = "Vec::new")]
     pub lane_section: Vec<Section>,
+}
+
+impl Lanes {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        _attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        let mut lane_offset = Vec::new();
+        let mut lane_section = Vec::new();
+
+        find_map_parse_elem!(
+            events,
+            "laneOffset" => |attributes| {
+                lane_offset.push(Offset::from_events(events, attributes)?);
+                Ok(())
+            },
+            "laneSection" => |attributes| {
+                lane_section.push(Section::from_events(events, attributes)?);
+                Ok(())
+            },
+        );
+
+        Ok(Self {
+            lane_offset,
+            lane_section,
+        })
+    }
 }
 
 /// A lane offset may be used to shift the center lane away from the road reference line.
@@ -25,6 +57,22 @@ pub struct Offset {
     pub d: f64,
     /// s-coordinate of start position
     pub s: f64,
+}
+
+impl Offset {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        find_map_parse_elem!(events);
+        Ok(Self {
+            a: find_map_parse_attr!(attributes, "a", f64)?,
+            b: find_map_parse_attr!(attributes, "b", f64)?,
+            c: find_map_parse_attr!(attributes, "c", f64)?,
+            d: find_map_parse_attr!(attributes, "d", f64)?,
+            s: find_map_parse_attr!(attributes, "s", f64)?,
+        })
+    }
 }
 
 /// Lanes may be split into multiple lane sections. Each lane section contains a fixed number of
@@ -43,12 +91,66 @@ pub struct Section {
     pub right: Option<Right>,
 }
 
+impl Section {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        let mut left = None;
+        let mut center = None;
+        let mut right = None;
+
+        find_map_parse_elem!(
+            events,
+            "left" => |attributes| {
+                left = Some(Left::from_events(events, attributes)?);
+                Ok(())
+            },
+            "center" true => |attributes| {
+                center = Some(Center::from_events(events, attributes)?);
+                Ok(())
+            },
+            "right" => |attributes| {
+                right = Some(Right::from_events(events, attributes)?);
+                Ok(())
+            },
+        );
+
+        Ok(Self {
+            s: find_map_parse_attr!(attributes, "s", f64)?,
+            single_side: find_map_parse_attr!(attributes, "singleSide", Option<bool>)?,
+            left,
+            center: center.expect("Marked as required"),
+            right,
+        })
+    }
+}
+
 /// For easier navigation through an ASAM OpenDRIVE road description, the lanes within a lane
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Left {
     pub lane: Vec<LeftLane>,
+}
+
+impl Left {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        _attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        let mut lane = Vec::new();
+
+        find_map_parse_elem!(
+            events,
+            "lane" => |attributes| {
+                lane.push(LeftLane::from_events(events, attributes)?);
+                Ok(())
+            }
+        );
+
+        Ok(Self { lane })
+    }
 }
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
@@ -61,12 +163,43 @@ pub struct LeftLane {
     pub base: Lane,
 }
 
+impl LeftLane {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        Ok(Self {
+            id: find_map_parse_attr!(attributes, "id", i64)?,
+            base: Lane::from_events(events, Vec::new())?,
+        })
+    }
+}
+
 /// For easier navigation through an ASAM OpenDRIVE road description, the lanes within a lane
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Center {
     pub lane: Vec<CenterLane>,
+}
+
+impl Center {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        _attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        let mut lane = Vec::new();
+
+        find_map_parse_elem!(
+            events,
+            "lane" => |attributes| {
+                lane.push(CenterLane::from_events(events, attributes)?);
+                Ok(())
+            }
+        );
+
+        Ok(Self { lane })
+    }
 }
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
@@ -79,12 +212,43 @@ pub struct CenterLane {
     pub base: Lane,
 }
 
+impl CenterLane {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        Ok(Self {
+            id: find_map_parse_attr!(attributes, "id", i64)?,
+            base: Lane::from_events(events, Vec::new())?,
+        })
+    }
+}
+
 /// For easier navigation through an ASAM OpenDRIVE road description, the lanes within a lane
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Right {
     pub lane: Vec<RightLane>,
+}
+
+impl Right {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        _attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        let mut lane = Vec::new();
+
+        find_map_parse_elem!(
+            events,
+            "lane" => |attributes| {
+                lane.push(RightLane::from_events(events, attributes)?);
+                Ok(())
+            }
+        );
+
+        Ok(Self { lane })
+    }
 }
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
@@ -97,16 +261,29 @@ pub struct RightLane {
     pub base: Lane,
 }
 
+impl RightLane {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        Ok(Self {
+            id: find_map_parse_attr!(attributes, "id", i64)?,
+            base: Lane::from_events(events, Vec::new())?,
+        })
+    }
+}
+
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
 /// lanes from left to right, that is, with descending ID.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Lane {
     pub link: Option<LaneLink>,
-    #[serde(flatten)]
-    // todo actually unbound
-    pub choice: Option<LaneChoice>,
-    // #[serde(flatten, rename = "roadMark")] // todo actually unbound
-    // pub material: Vec<RoadMark>, // TODO
+    // #[serde(flatten, default = "Vec::new")]
+    #[serde(rename = "$value", default = "Vec::new")]
+    pub choice: Vec<LaneChoice>,
+    // #[serde(flatten, rename = "roadMark", default = "Vec::new")]
+    // pub road_mark: Vec<RoadMark>,
+    // TODO
     // #[serde(default = "Vec::new")]
     // pub material: Vec<Material>, // TODO
     // #[serde(default = "Vec::new")]
@@ -117,6 +294,34 @@ pub struct Lane {
     // pub height: Vec<Height>, // TODO
     // #[serde(default = "Vec::new")]
     // pub rule: Vec<Rule>, // TODO
+}
+
+impl Lane {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        _attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        let mut link = None;
+        let mut choice = Vec::new();
+
+        find_map_parse_elem!(
+            events,
+            "link" => |attributes| {
+                link = Some(LaneLink::from_events(events, attributes)?);
+                Ok(())
+            },
+            "border" => |attributes| {
+                choice.push(LaneChoice::Border(Border::from_events(events, attributes)?));
+                Ok(())
+            },
+            "width" => |attributes| {
+                choice.push(LaneChoice::Width(Width::from_events(events, attributes)?));
+                Ok(())
+            },
+        );
+
+        Ok(Self { link, choice })
+    }
 }
 
 /// For links between lanes with an identical reference line, the lane predecessor and successor
@@ -133,10 +338,49 @@ pub struct LaneLink {
     successor: Vec<PredecessorSuccessor>,
 }
 
+impl LaneLink {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        _attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        let mut predecessor = Vec::new();
+        let mut successor = Vec::new();
+
+        find_map_parse_elem!(
+            events,
+            "predecessor" => |attributes| {
+                predecessor.push(PredecessorSuccessor::from_events(events, attributes)?);
+                Ok(())
+            },
+            "successor" => |attributes| {
+                successor.push(PredecessorSuccessor::from_events(events, attributes)?);
+                Ok(())
+            },
+        );
+
+        Ok(Self {
+            predecessor,
+            successor,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PredecessorSuccessor {
     /// ID of the preceding / succeeding linked lane
     id: i64,
+}
+
+impl PredecessorSuccessor {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        find_map_parse_elem!(events);
+        Ok(Self {
+            id: find_map_parse_attr!(attributes, "id", i64)?,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -184,6 +428,22 @@ pub struct Border {
     pub s_offset: Length,
 }
 
+impl Border {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        find_map_parse_elem!(events);
+        Ok(Self {
+            a: find_map_parse_attr!(attributes, "a", f64)?,
+            b: find_map_parse_attr!(attributes, "b", f64)?,
+            c: find_map_parse_attr!(attributes, "c", f64)?,
+            d: find_map_parse_attr!(attributes, "d", f64)?,
+            s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
+        })
+    }
+}
+
 /// The width of a lane is defined along the t-coordinate. The width of a lane may change within a
 /// lane section.
 /// Lane width and lane border elements are mutually exclusive within the same lane group. If both
@@ -216,7 +476,18 @@ pub struct Width {
     pub s_offset: Length,
 }
 
-/// Defines the style of the line at the outer border of a lane. The style of the center line that
-/// separates left and right lanes is determined by the road mark element for the center lane.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RoadMark {}
+impl Width {
+    pub fn from_events(
+        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Result<Self, crate::parser::Error> {
+        find_map_parse_elem!(events);
+        Ok(Self {
+            a: find_map_parse_attr!(attributes, "a", f64)?,
+            b: find_map_parse_attr!(attributes, "b", f64)?,
+            c: find_map_parse_attr!(attributes, "c", f64)?,
+            d: find_map_parse_attr!(attributes, "d", f64)?,
+            s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
+        })
+    }
+}

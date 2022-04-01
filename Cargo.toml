@@ -13,3 +13,7 @@ serde-aux = "3.0.1"
 url = { version = "2.2.2", features = ["serde"] }
 chrono = { version = "0.4.19", features = ["serde"] }
 uom = { version = "0.32.0", features = ["serde", "f64"] }
+
+xml-rs = "0.8"
+derive_more = "0.99.17"
+thiserror = "1.0.30"
