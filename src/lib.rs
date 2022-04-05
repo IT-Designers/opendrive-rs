@@ -5,6 +5,11 @@ pub mod core;
 pub mod junction;
 pub mod road;
 
+#[cfg(feature = "fuzzing")]
+pub mod fuzzing;
+
+pub use xml;
+
 #[cfg(test)]
 mod tests {
     use crate::core::OpenDrive;

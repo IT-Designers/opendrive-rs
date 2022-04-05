@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 use xml::attribute::OwnedAttribute;
@@ -267,7 +268,8 @@ impl RightLane {
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
 /// lanes from left to right, that is, with descending ID.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Lane {
     pub link: Option<LaneLink>,
     pub choice: Vec<LaneChoice>,
@@ -306,6 +308,31 @@ impl Lane {
 
         Ok(Self { link, choice })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visitor(Cow::default())
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        if let Some(link) = &self.link {
+            visit_children!(visitor, "link" => link);
+        }
+        for choice in &self.choice {
+            match choice {
+                LaneChoice::Border(border) => visit_children!(visitor, "border" => border),
+                LaneChoice::Width(width) => visit_children!(visitor, "width" => width),
+            }
+        }
+        Ok(())
+    }
 }
 
 /// For links between lanes with an identical reference line, the lane predecessor and successor
@@ -314,7 +341,8 @@ impl Lane {
 /// information provide the IDs of lanes on the first or last lane section of the other reference
 /// line depending on the contact point of the road linkage.
 /// This element may only be omitted, if lanes end at a junction or have no physical link.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct LaneLink {
     pub predecessor: Vec<PredecessorSuccessor>,
     pub successor: Vec<PredecessorSuccessor>,
@@ -345,9 +373,32 @@ impl LaneLink {
             successor,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor)
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        for predecessor in &self.predecessor {
+            visit_children!(visitor, "predecessor" => predecessor);
+        }
+        for successor in &self.successor {
+            visit_children!(visitor, "successor" => successor);
+        }
+        Ok(())
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct PredecessorSuccessor {
     /// ID of the preceding / succeeding linked lane
     pub id: i64,
@@ -363,9 +414,26 @@ impl PredecessorSuccessor {
             id: find_map_parse_attr!(attributes, "id", i64)?,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor, "id" => &self.id.to_string())
+    }
+
+    pub fn visit_children(
+        &self,
+        _visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        Ok(())
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum LaneChoice {
     Border(Border),
     Width(Width),
@@ -382,7 +450,7 @@ pub enum LaneChoice {
 /// application shall use the information from the `<width>` elements.
 /// In ASAM OpenDRIVE, lane borders are represented by the `<border>` element within the `<lane>`
 /// element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Border {
     /// Polynom parameter a, border position at @s (ds=0)
     // https://github.com/RReverser/serde-xml-rs/issues/137
@@ -416,6 +484,44 @@ impl Border {
             s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(
+            visitor,
+            "a" => &self.a.to_string(),
+            "b" => &self.b.to_string(),
+            "c" => &self.c.to_string(),
+            "d" => &self.d.to_string(),
+            "sOffset" => &self.s_offset.value.to_string(),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Border {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            a: u.not_nan_f64()?,
+            b: u.not_nan_f64()?,
+            c: u.not_nan_f64()?,
+            d: u.not_nan_f64()?,
+            s_offset: Length::new::<meter>(u.not_nan_f64()?),
+        })
+    }
 }
 
 /// The width of a lane is defined along the t-coordinate. The width of a lane may change within a
@@ -424,7 +530,7 @@ impl Border {
 /// width and lane border elements are present for a lane section in the ASAM OpenDRIVE file, the
 /// application must use the information from the `<width>` elements.
 /// In ASAM OpenDRIVE, lane width is described by the `<width>` element within the `<lane>` element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Width {
     /// Polynom parameter a, width at @s (ds=0)
     // https://github.com/RReverser/serde-xml-rs/issues/137
@@ -456,6 +562,44 @@ impl Width {
             c: find_map_parse_attr!(attributes, "c", f64)?,
             d: find_map_parse_attr!(attributes, "d", f64)?,
             s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
+        })
+    }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(
+            visitor,
+            "a" => &self.a.to_string(),
+            "b" => &self.b.to_string(),
+            "c" => &self.c.to_string(),
+            "d" => &self.d.to_string(),
+            "sOffset" => &self.s_offset.value.to_string(),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Width {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            a: u.not_nan_f64()?,
+            b: u.not_nan_f64()?,
+            c: u.not_nan_f64()?,
+            d: u.not_nan_f64()?,
+            s_offset: Length::new::<meter>(u.not_nan_f64()?),
         })
     }
 }

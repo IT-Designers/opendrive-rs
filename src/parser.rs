@@ -68,6 +68,7 @@ pub enum ParseError {
     Bool(ParseBoolError),
 }
 
+#[macro_export]
 macro_rules! find_map_parse_attr {
     ($attrs:ident, $name:literal, Option<$ty:ty>) => {
         $attrs
@@ -76,17 +77,18 @@ macro_rules! find_map_parse_attr {
             .map(|a| {
                 a.value
                     .parse::<$ty>()
-                    .map_err(|e| crate::parser::Error::from((stringify!($ty), e)))
+                    .map_err(|e| $crate::parser::Error::from((stringify!($ty), e)))
             })
             .transpose()
     };
     ($attrs:ident, $name:literal, $ty:ty) => {
         find_map_parse_attr!($attrs, $name, Option<$ty>).and_then(|v| {
-            v.ok_or_else(|| crate::parser::Error::AttributeMissing($name.to_string()))
+            v.ok_or_else(|| $crate::parser::Error::AttributeMissing($name.to_string()))
         })
     };
 }
 
+#[macro_export]
 macro_rules! find_map_parse_elem {
     ($events:ident $(, $name:literal $($req:literal)? => $body:expr)* $(, _ => $alt:expr)? $(,)?) => {
         let mut __fields = [
@@ -103,7 +105,7 @@ macro_rules! find_map_parse_elem {
 
         while let Some(event) = $events.next() {
             match event? {
-                XmlEvent::StartElement {
+                xml::reader::XmlEvent::StartElement {
                     name,
                     attributes,
                     namespace: _,
@@ -111,7 +113,7 @@ macro_rules! find_map_parse_elem {
                     let mut __index = 1;
                     $(
                         if name.local_name == $name {
-                            let v: Result<(), crate::parser::Error> = $body(attributes);
+                            let v: Result<(), $crate::parser::Error> = $body(attributes);
                             v?;
                             __fields[__index] = false;
                             continue;
@@ -124,8 +126,8 @@ macro_rules! find_map_parse_elem {
                     let mut depth = 1_usize;
                     while let Some(event) = $events.next() {
                         match event? {
-                            XmlEvent::StartElement { .. } => depth += 1,
-                            XmlEvent::EndElement { .. } => {
+                            xml::reader::XmlEvent::StartElement { .. } => depth += 1,
+                            xml::reader::XmlEvent::EndElement { .. } => {
                                 depth -= 1;
                                 if depth == 0 {
                                     break;
@@ -135,10 +137,10 @@ macro_rules! find_map_parse_elem {
                         }
                     }
                 }
-                XmlEvent::EndElement { .. } => break,
+                xml::reader::XmlEvent::EndElement { .. } => break,
                 _event => {
                     $(
-                        let v: Result<(), crate::parser::Error> = $alt(_event);
+                        let v: Result<(), $crate::parser::Error> = $alt(_event);
                         v?;
                     )?
                 }
@@ -151,10 +153,44 @@ macro_rules! find_map_parse_elem {
             if __fields[__index] {
                 $(
                     let _: bool = $req;
-                    return Err(crate::parser::Error::ElementMissing(stringify!($name).to_string()))
+                    return Err($crate::parser::Error::ElementMissing(stringify!($name).to_string()))
                 )?
             }
             __index += 1;
         )*
+    }
+}
+
+#[macro_export]
+macro_rules! visit_attributes {
+    ($visitor:ident$(, $name:literal => $attr:expr)* $(,)?) => {
+        $visitor(Cow::Borrowed(&[
+            $(
+                xml::attribute::Attribute::new(
+                    xml::name::Name::local($name),
+                    $attr
+                ),
+            )*
+        ]))
+    }
+}
+
+#[macro_export]
+macro_rules! visit_children {
+    ($visitor:ident $(, $name:literal => $child:expr)* $(,)?) => {
+        {
+            let _ = &mut $visitor;
+            $(
+                $child.visit_attributes(|attributes| {
+                    $visitor(xml::writer::XmlEvent::StartElement {
+                        name: xml::name::Name::local($name),
+                        attributes,
+                        namespace: Cow::Owned(xml::namespace::Namespace::empty()),
+                    })
+                })?;
+                $child.visit_children(&mut $visitor)?;
+                $visitor(xml::writer::XmlEvent::EndElement { name: None })?;
+            )*
+        }
     }
 }
