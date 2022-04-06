@@ -230,7 +230,7 @@ impl Offset {
     ) -> Result<Self, crate::parser::Error> {
         find_map_parse_elem!(events);
         Ok(Self {
-            hdg: find_map_parse_attr!(attributes, "hdg", f64).map(|v| Angle::new::<radian>(v))?,
+            hdg: find_map_parse_attr!(attributes, "hdg", f64).map(Angle::new::<radian>)?,
             x: find_map_parse_attr!(attributes, "x", f64).map(Length::new::<meter>)?,
             y: find_map_parse_attr!(attributes, "y", f64).map(Length::new::<meter>)?,
             z: find_map_parse_attr!(attributes, "z", f64).map(Length::new::<meter>)?,

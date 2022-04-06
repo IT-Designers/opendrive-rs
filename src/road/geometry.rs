@@ -93,7 +93,7 @@ impl Geometry {
             s: find_map_parse_attr!(attributes, "s", f64).map(Length::new::<meter>)?,
             x: find_map_parse_attr!(attributes, "x", f64).map(Length::new::<meter>)?,
             y: find_map_parse_attr!(attributes, "y", f64).map(Length::new::<meter>)?,
-            choice: choice.ok_or_else(|| crate::parser::Error::child_missing::<Self>())?,
+            choice: choice.ok_or_else(crate::parser::Error::child_missing::<Self>)?,
         })
     }
 }
