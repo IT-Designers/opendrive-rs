@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use uom::si::angle::radian;
 use uom::si::curvature::radian_per_meter;
@@ -8,10 +9,11 @@ use xml::reader::XmlEvent;
 
 /// Contains geometry elements that define the layout of the road reference line in the x/y-plane
 /// (plan view).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct PlanView {
     pub geometry: Vec<Geometry>,
-    pub additional_data: HashMap<String, String>,
+    // TODO pub additional_data: HashMap<String, String>,
 }
 
 impl PlanView {
@@ -34,14 +36,30 @@ impl PlanView {
             }
         );
 
-        Ok(Self {
-            geometry,
-            additional_data,
-        })
+        Ok(Self { geometry })
+    }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor)
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        for geometry in &self.geometry {
+            visit_children!(visitor, "geometry" => geometry);
+        }
+        Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Geometry {
     /// Start orientation (inertial heading)
     pub hdg: Angle,
@@ -96,9 +114,57 @@ impl Geometry {
             choice: choice.ok_or_else(crate::parser::Error::child_missing::<Self>)?,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(
+            visitor,
+            "hdg" => &self.hdg.value.to_scientific_string(),
+            "length" => &self.length.value.to_scientific_string(),
+            "s" => &self.s.value.to_scientific_string(),
+            "x" => &self.x.value.to_scientific_string(),
+            "y" => &self.y.value.to_scientific_string(),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        match &self.choice {
+            GeometryType::Line(value) => visit_children!(visitor, "line" => value),
+            GeometryType::Spiral(value) => visit_children!(visitor, "spiral" => value),
+            GeometryType::Arc(value) => visit_children!(visitor, "arc" => value),
+            GeometryType::Poly3(value) => visit_children!(visitor, "poly3" => value),
+            GeometryType::ParamPoly3(value) => {
+                visit_children!(visitor, "paramPoly3" => value)
+            }
+        }
+        Ok(())
+    }
 }
 
-#[derive(Debug, Clone)]
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Geometry {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            hdg: Angle::new::<radian>(u.not_nan_f64()?),
+            length: Length::new::<meter>(u.not_nan_f64()?),
+            s: Length::new::<meter>(u.not_nan_f64()?),
+            x: Length::new::<meter>(u.not_nan_f64()?),
+            y: Length::new::<meter>(u.not_nan_f64()?),
+            choice: u.arbitrary()?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum GeometryType {
     Line(Line),
     Spiral(Spiral),
@@ -110,7 +176,8 @@ pub enum GeometryType {
 /// A straight line is the simplest geometry element. It contains no further attributes.
 /// In ASAM OpenDRIVE, a straight line is represented by a `<line>` element within the `<geometry>`
 /// element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Line {
     // lol
 }
@@ -123,11 +190,28 @@ impl Line {
         find_map_parse_elem!(events);
         Ok(Self {})
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor)
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
 }
 
 /// In ASAM OpenDRIVE, a spiral is represented by a `<spiral>` element within the `<geometry>`
 /// element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Spiral {
     /// Curvature at the start of the element
     // https://github.com/RReverser/serde-xml-rs/issues/137
@@ -150,11 +234,43 @@ impl Spiral {
                 .map(Curvature::new::<radian_per_meter>)?,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(
+            visitor,
+            "curvStart" => &self.curvature_start.value.to_scientific_string(),
+            "curvEnd" => &self.curvature_end.value.to_scientific_string(),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Spiral {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            curvature_start: Curvature::new::<radian_per_meter>(u.not_nan_f64()?),
+            curvature_end: Curvature::new::<radian_per_meter>(u.not_nan_f64()?),
+        })
+    }
 }
 
 /// An arc describes a road reference line with constant curvature. In ASAM OpenDRIVE, an arc is
 /// represented by an `<arc>` element within the `<geometry>` element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Arc {
     /// Constant curvature throughout the element
     // https://github.com/RReverser/serde-xml-rs/issues/137
@@ -172,11 +288,41 @@ impl Arc {
                 .map(Curvature::new::<radian_per_meter>)?,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(
+            visitor,
+            "curvature" => &self.curvature.value.to_scientific_string(),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Arc {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            curvature: Curvature::new::<radian_per_meter>(u.not_nan_f64()?),
+        })
+    }
 }
 
 /// In ASAM OpenDRIVE, a cubic polynom is represented by a `<poly3>` element within the `<geometry>`
 /// element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Poly3 {
     /// Polynom parameter a
     // https://github.com/RReverser/serde-xml-rs/issues/137
@@ -205,11 +351,47 @@ impl Poly3 {
             d: find_map_parse_attr!(attributes, "d", f64)?,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(
+            visitor,
+            "a" => &self.a.to_scientific_string(),
+            "b" => &self.b.to_scientific_string(),
+            "c" => &self.c.to_scientific_string(),
+            "d" => &self.d.to_scientific_string(),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Poly3 {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            a: u.not_nan_f64()?,
+            b: u.not_nan_f64()?,
+            c: u.not_nan_f64()?,
+            d: u.not_nan_f64()?,
+        })
+    }
 }
 
 /// In ASAM OpenDRIVE, parametric cubic curves are represented by `<paramPoly3>` elements within the
 /// `<geometry>` element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParamPoly3 {
     /// Polynom parameter a for u
     // https://github.com/RReverser/serde-xml-rs/issues/137
@@ -257,6 +439,52 @@ impl ParamPoly3 {
             d_u: find_map_parse_attr!(attributes, "dU", f64)?,
             d_v: find_map_parse_attr!(attributes, "dV", f64)?,
             p_range: find_map_parse_attr!(attributes, "pRange", f64)?,
+        })
+    }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(
+            visitor,
+            "aU" => &self.a_u.to_scientific_string(),
+            "aV" => &self.a_v.to_scientific_string(),
+            "bU" => &self.b_u.to_scientific_string(),
+            "bV" => &self.b_v.to_scientific_string(),
+            "cU" => &self.c_u.to_scientific_string(),
+            "cV" => &self.c_v.to_scientific_string(),
+            "dU" => &self.d_u.to_scientific_string(),
+            "dV" => &self.d_v.to_scientific_string(),
+            "pRange" => &self.p_range.to_scientific_string(),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for ParamPoly3 {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            a_u: u.not_nan_f64()?,
+            a_v: u.not_nan_f64()?,
+            b_u: u.not_nan_f64()?,
+            b_v: u.not_nan_f64()?,
+            c_u: u.not_nan_f64()?,
+            c_v: u.not_nan_f64()?,
+            d_u: u.not_nan_f64()?,
+            d_v: u.not_nan_f64()?,
+            p_range: u.not_nan_f64()?,
         })
     }
 }

@@ -6,38 +6,28 @@ pub enum ConnectionType {
     Vertical,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum ContactPoint {
     Start,
     End,
 }
 
-impl FromStr for ContactPoint {
-    type Err = crate::parser::Error;
+impl_from_str_as_str!(
+    ContactPoint,
+    "start" => Start,
+    "end" => End,
+);
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            _ if s.eq_ignore_ascii_case("start") => Ok(Self::Start),
-            _ if s.eq_ignore_ascii_case("end") => Ok(Self::End),
-            _ => Err(crate::parser::Error::invalid_value_for::<Self, _>(s)),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum ElementDir {
     Plus,
     Minus,
 }
 
-impl FromStr for ElementDir {
-    type Err = crate::parser::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "+" => Ok(Self::Plus),
-            "-" => Ok(Self::Minus),
-            _ => Err(crate::parser::Error::invalid_value_for::<Self, _>(s)),
-        }
-    }
-}
+impl_from_str_as_str!(
+    ElementDir,
+    "+" => Plus,
+    "-" => Minus,
+);

@@ -68,6 +68,17 @@ pub enum ParseError {
     Bool(ParseBoolError),
 }
 
+pub trait ToScientificString {
+    fn to_scientific_string(&self) -> String;
+}
+
+impl ToScientificString for f64 {
+    fn to_scientific_string(&self) -> String {
+        // TODO {:.17e+02} does not work
+        format!("{:.17e}", self)
+    }
+}
+
 #[macro_export]
 macro_rules! find_map_parse_attr {
     ($attrs:ident, $name:literal, Option<$ty:ty>) => {
@@ -164,14 +175,38 @@ macro_rules! find_map_parse_elem {
 #[macro_export]
 macro_rules! visit_attributes {
     ($visitor:ident$(, $name:literal => $attr:expr)* $(,)?) => {
-        $visitor(Cow::Borrowed(&[
-            $(
+        $visitor(Cow::Borrowed({
+            #[allow(unused)]
+            use $crate::parser::ToScientificString as _;
+            &[
+                $(
+                    xml::attribute::Attribute::new(
+                        xml::name::Name::local($name),
+                        $attr
+                    ),
+                )*
+            ]
+        }))
+    }
+}
+
+#[macro_export]
+macro_rules! visit_attributes_flatten {
+    ($visitor:ident$(, $name:literal => $attr:expr)* $(,)?) => {
+        $visitor(Cow::Borrowed({
+            #[allow(unused)]
+            use $crate::parser::ToScientificString as _;
+            &[
+                $(
+                    $attr.map(|attr| ($name, attr)),
+                )*
+            ].into_iter().flatten().map(|(name, attr)| {
                 xml::attribute::Attribute::new(
-                    xml::name::Name::local($name),
-                    $attr
-                ),
-            )*
-        ]))
+                    xml::name::Name::local(name),
+                    attr
+                )
+            }).collect::<Vec<_>>()
+        }))
     }
 }
 
@@ -193,4 +228,28 @@ macro_rules! visit_children {
             )*
         }
     }
+}
+
+#[macro_export]
+macro_rules! impl_from_str_as_str {
+    ($ty:ty $(, $name:literal => $value:ident)* $(,)?) => {
+        impl $ty {
+            pub fn as_str(&self) -> &'static str {
+                match self {
+                    $(<$ty>::$value => $name,)*
+                }
+            }
+        }
+
+        impl FromStr for $ty {
+            type Err = $crate::parser::Error;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $(_ if s.eq_ignore_ascii_case(Self::$value.as_str()) => Ok(Self::$value),)*
+                    _ => Err($crate::parser::Error::invalid_value_for::<Self, _>(s)),
+                }
+            }
+        }
+    };
 }

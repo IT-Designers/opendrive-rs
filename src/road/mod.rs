@@ -2,6 +2,7 @@ use crate::junction::{ContactPoint, ElementDir};
 use crate::road::geometry::PlanView;
 use crate::road::lane::Lanes;
 use crate::road::profile::{ElevationProfile, LateralProfile};
+use std::borrow::Cow;
 use std::str::FromStr;
 use uom::si::f64::Length;
 use uom::si::length::meter;
@@ -22,7 +23,7 @@ pub mod profile;
 /// element may cover a long stretch of a road, shorter stretches between junctions, or even several
 /// roads. A new `<road>` element should only start if the properties of the road cannot be
 /// described within the previous `<road>` element or if a junction is required.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Road {
     /// Unique ID within the database. If it represents an integer number, it should comply to
     /// `uint32_t` and stay within the given range.
@@ -96,11 +97,72 @@ impl Road {
             lanes: lanes.unwrap(),
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes_flatten!(
+            visitor,
+            "id" => Some(self.id.as_str()),
+            "junction" => Some(self.junction.as_str()),
+            "length" => Some(self.length.value.to_scientific_string()).as_deref(),
+            "name" => self.name.as_deref(),
+            "rule" => self.rule.as_ref().map(Rule::as_str),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        if let Some(link) = &self.link {
+            visit_children!(visitor, "link" => link);
+        }
+
+        if let Some(elevation) = &self.elevation_profile {
+            visit_children!(visitor, "elevationProfile" => elevation);
+        }
+
+        if let Some(lateral) = &self.lateral_profile {
+            visit_children!(visitor, "lateralProfile" => lateral);
+        }
+
+        visit_children!(
+            visitor,
+            "planView" => self.plan_view,
+            "lanes" => self.lanes,
+        );
+
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Road {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            id: u.arbitrary()?,
+            junction: u.arbitrary()?,
+            length: Length::new::<meter>(u.not_nan_f64()?),
+            name: u.arbitrary()?,
+            rule: u.arbitrary()?,
+            link: u.arbitrary()?,
+            plan_view: u.arbitrary()?,
+            elevation_profile: u.arbitrary()?,
+            lateral_profile: u.arbitrary()?,
+            lanes: u.arbitrary()?,
+        })
+    }
 }
 
 /// Follows the road header if the road is linked to a successor or a predecessor. Isolated roads
 /// may omit this element.
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Link {
     pub predecessor: Option<PredecessorSuccessor>,
     pub successor: Option<PredecessorSuccessor>,
@@ -127,11 +189,35 @@ impl Link {
 
         Ok(this)
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor)
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        if let Some(predecessor) = &self.predecessor {
+            visit_children!(visitor, "predecessor" => predecessor);
+        }
+
+        if let Some(successor) = &self.successor {
+            visit_children!(visitor, "successor" => successor);
+        }
+
+        Ok(())
+    }
 }
 
 /// Successors and predecessors can be junctions or roads. For each, different attribute sets shall
 /// be used.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PredecessorSuccessor {
     /// Contact point of link on the linked element
     pub contact_point: Option<ContactPoint>,
@@ -163,40 +249,72 @@ impl PredecessorSuccessor {
             element_type: find_map_parse_attr!(attributes, "elementType", Option<ElementType>)?,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes_flatten!(
+            visitor,
+            "contactPoint" => self.contact_point.as_ref().map(ContactPoint::as_str),
+            "elementDir" => self.element_dir.as_ref().map(ElementDir::as_str),
+            "elementId" => Some(self.element_id.as_str()),
+            "elementS" => self.element_s.map(|v| v.value.to_scientific_string()).as_deref(),
+            "elementType" => self.element_type.as_ref().map(ElementType::as_str),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
 }
 
-#[derive(Debug, Clone)]
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for PredecessorSuccessor {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            contact_point: u.arbitrary()?,
+            element_dir: u.arbitrary()?,
+            element_id: u.arbitrary()?,
+            element_s: if u.arbitrary()? {
+                Some(Length::new::<meter>(u.not_nan_f64()?))
+            } else {
+                None
+            },
+            element_type: u.arbitrary()?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum ElementType {
     Road,
     Junction,
 }
 
-impl FromStr for ElementType {
-    type Err = crate::parser::Error;
+impl_from_str_as_str!(
+    ElementType,
+    "road" => Road,
+    "junction" => Junction,
+);
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            _ if s.eq_ignore_ascii_case("road") => Ok(Self::Road),
-            _ if s.eq_ignore_ascii_case("junction") => Ok(Self::Junction),
-            _ => Err(crate::parser::Error::invalid_value_for::<Self, _>(s)),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum Rule {
     RightHandTraffic,
     LeftHandTraffic,
 }
 
-impl FromStr for Rule {
-    type Err = crate::parser::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            _ if s.eq_ignore_ascii_case("LHT") => Ok(Self::LeftHandTraffic),
-            _ if s.eq_ignore_ascii_case("RHT") => Ok(Self::RightHandTraffic),
-            _ => Err(crate::parser::Error::invalid_value_for::<Self, _>(s)),
-        }
-    }
-}
+impl_from_str_as_str!(
+    Rule,
+    "RHT" => RightHandTraffic,
+    "LHT" => LeftHandTraffic,
+);

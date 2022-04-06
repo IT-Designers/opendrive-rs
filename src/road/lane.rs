@@ -8,7 +8,8 @@ pub mod mark;
 
 /// Contains a series of lane section elements that define the characteristics of the road cross
 /// sections with respect to the lanes along the reference line.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Lanes {
     pub lane_offset: Vec<Offset>,
     pub lane_section: Vec<Section>,
@@ -39,10 +40,32 @@ impl Lanes {
             lane_section,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor)
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        for lane_offset in &self.lane_offset {
+            visit_children!(visitor, "laneOffset" => lane_offset);
+        }
+        for lane_section in &self.lane_section {
+            visit_children!(visitor, "laneSection" => lane_section);
+        }
+        Ok(())
+    }
 }
 
 /// A lane offset may be used to shift the center lane away from the road reference line.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Offset {
     /// Polynom parameter a, offset at @s (ds=0)
     pub a: f64,
@@ -70,12 +93,50 @@ impl Offset {
             s: find_map_parse_attr!(attributes, "s", f64)?,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(
+            visitor,
+            "a" => &self.a.to_scientific_string(),
+            "b" => &self.b.to_scientific_string(),
+            "c" => &self.c.to_scientific_string(),
+            "d" => &self.d.to_scientific_string(),
+            "s" => &self.s.to_scientific_string(),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Offset {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            a: u.not_nan_f64()?,
+            b: u.not_nan_f64()?,
+            c: u.not_nan_f64()?,
+            d: u.not_nan_f64()?,
+            s: u.not_nan_f64()?,
+        })
+    }
 }
 
 /// Lanes may be split into multiple lane sections. Each lane section contains a fixed number of
 /// lanes. Every time the number of lanes changes, a new lane section is required. The distance
 /// between two succeeding lane sections shall not be zero.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Section {
     /// s-coordinate of start position
     pub s: f64,
@@ -120,12 +181,57 @@ impl Section {
             right,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes_flatten!(
+            visitor,
+            "s" => Some(self.s.to_scientific_string()).as_deref(),
+            "singleSide" => self.single_side.map(|b| b.to_string()).as_deref()
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        if let Some(left) = &self.left {
+            visit_children!(visitor, "left" => left);
+        }
+
+        visit_children!(visitor, "center" => self.center);
+
+        if let Some(right) = &self.right {
+            visit_children!(visitor, "right" => right);
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Section {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            s: u.not_nan_f64()?,
+            single_side: u.arbitrary()?,
+            left: u.arbitrary()?,
+            center: u.arbitrary()?,
+            right: u.arbitrary()?,
+        })
+    }
 }
 
 /// For easier navigation through an ASAM OpenDRIVE road description, the lanes within a lane
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Left {
     pub lane: Vec<LeftLane>,
 }
@@ -147,11 +253,31 @@ impl Left {
 
         Ok(Self { lane })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor)
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        for lane in &self.lane {
+            visit_children!(visitor, "lane" => lane);
+        }
+        Ok(())
+    }
 }
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
 /// lanes from left to right, that is, with descending ID.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct LeftLane {
     /// ID of the lane
     pub id: i64,
@@ -168,12 +294,37 @@ impl LeftLane {
             base: Lane::from_events(events, Vec::new())?,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        self.base.visit_attributes(|attributes| {
+            let mut attributes = attributes.to_vec();
+            let value = self.id.to_string();
+            attributes.push(xml::attribute::Attribute::new(
+                xml::name::Name::local("id"),
+                &value,
+            ));
+            visitor(Cow::Owned(attributes))
+        })
+    }
+
+    pub fn visit_children(
+        &self,
+        visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        self.base.visit_children(visitor)
+    }
 }
 
 /// For easier navigation through an ASAM OpenDRIVE road description, the lanes within a lane
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Center {
     pub lane: Vec<CenterLane>,
 }
@@ -195,11 +346,31 @@ impl Center {
 
         Ok(Self { lane })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor)
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        for lane in &self.lane {
+            visit_children!(visitor, "lane" => lane);
+        }
+        Ok(())
+    }
 }
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
 /// lanes from left to right, that is, with descending ID.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct CenterLane {
     /// ID of the lane
     pub id: i64,
@@ -216,12 +387,37 @@ impl CenterLane {
             base: Lane::from_events(events, Vec::new())?,
         })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        self.base.visit_attributes(|attributes| {
+            let mut attributes = attributes.to_vec();
+            let value = self.id.to_string();
+            attributes.push(xml::attribute::Attribute::new(
+                xml::name::Name::local("id"),
+                &value,
+            ));
+            visitor(Cow::Owned(attributes))
+        })
+    }
+
+    pub fn visit_children(
+        &self,
+        visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        self.base.visit_children(visitor)
+    }
 }
 
 /// For easier navigation through an ASAM OpenDRIVE road description, the lanes within a lane
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Right {
     pub lane: Vec<RightLane>,
 }
@@ -243,11 +439,31 @@ impl Right {
 
         Ok(Self { lane })
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor)
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        for lane in &self.lane {
+            visit_children!(visitor, "lane" => lane);
+        }
+        Ok(())
+    }
 }
 
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
 /// lanes from left to right, that is, with descending ID.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct RightLane {
     /// ID of the lane
     pub id: i64,
@@ -263,6 +479,30 @@ impl RightLane {
             id: find_map_parse_attr!(attributes, "id", i64)?,
             base: Lane::from_events(events, Vec::new())?,
         })
+    }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        self.base.visit_attributes(|attributes| {
+            let mut attributes = attributes.to_vec();
+            let value = self.id.to_string();
+            attributes.push(xml::attribute::Attribute::new(
+                xml::name::Name::local("id"),
+                &value,
+            ));
+            visitor(Cow::Owned(attributes))
+        })
+    }
+
+    pub fn visit_children(
+        &self,
+        visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        self.base.visit_children(visitor)
     }
 }
 
@@ -315,7 +555,7 @@ impl Lane {
             Cow<'b, [xml::attribute::Attribute<'b>]>,
         ) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
-        visitor(Cow::default())
+        visit_attributes!(visitor)
     }
 
     pub fn visit_children(
@@ -493,11 +733,11 @@ impl Border {
     ) -> xml::writer::Result<()> {
         visit_attributes!(
             visitor,
-            "a" => &self.a.to_string(),
-            "b" => &self.b.to_string(),
-            "c" => &self.c.to_string(),
-            "d" => &self.d.to_string(),
-            "sOffset" => &self.s_offset.value.to_string(),
+            "a" => &self.a.to_scientific_string(),
+            "b" => &self.b.to_scientific_string(),
+            "c" => &self.c.to_scientific_string(),
+            "d" => &self.d.to_scientific_string(),
+            "sOffset" => &self.s_offset.value.to_scientific_string(),
         )
     }
 
@@ -573,11 +813,11 @@ impl Width {
     ) -> xml::writer::Result<()> {
         visit_attributes!(
             visitor,
-            "a" => &self.a.to_string(),
-            "b" => &self.b.to_string(),
-            "c" => &self.c.to_string(),
-            "d" => &self.d.to_string(),
-            "sOffset" => &self.s_offset.value.to_string(),
+            "a" => &self.a.to_scientific_string(),
+            "b" => &self.b.to_scientific_string(),
+            "c" => &self.c.to_scientific_string(),
+            "d" => &self.d.to_scientific_string(),
+            "sOffset" => &self.s_offset.value.to_scientific_string(),
         )
     }
 
