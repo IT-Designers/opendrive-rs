@@ -26,7 +26,6 @@ fuzz_target!(|data: Lanes| {
     data.visit_children(|event| writer.write(event)).unwrap();
     writer.write(XmlEvent::EndElement { name: None }).unwrap();
 
-    dbg!(core::str::from_utf8(&bytes).unwrap());
     let reader = EventReader::from_str(core::str::from_utf8(&bytes).unwrap());
     let events = &mut reader.into_iter();
 
@@ -35,6 +34,9 @@ fuzz_target!(|data: Lanes| {
             events,
             "lanes" true => |attributes| {
                 let data_2 = Lanes::from_events(events, attributes)?;
+                if data != data_2 {
+                    dbg!(core::str::from_utf8(&bytes).unwrap());
+                }
                 assert_eq!(data, data_2);
                 Ok(())
             }
