@@ -220,7 +220,7 @@ macro_rules! visit_children {
                     $visitor(xml::writer::XmlEvent::StartElement {
                         name: xml::name::Name::local($name),
                         attributes,
-                        namespace: Cow::Owned(xml::namespace::Namespace::empty()),
+                        namespace: std::borrow::Cow::Owned(xml::namespace::Namespace::empty()),
                     })
                 })?;
                 $child.visit_children(&mut $visitor)?;

@@ -1,16 +1,18 @@
 use crate::road::Road;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use std::borrow::Cow;
 use std::str::FromStr;
 use uom::si::angle::radian;
 use uom::si::f64::{Angle, Length};
 use uom::si::length::meter;
 use xml::attribute::OwnedAttribute;
 use xml::reader::XmlEvent;
-use xml::EventReader;
+use xml::{EventReader, EventWriter};
 
 pub mod additional_data;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct OpenDrive {
     pub xmlns: String,
     pub header: Header,
@@ -61,6 +63,48 @@ impl OpenDrive {
             roads,
         })
     }
+
+    pub fn to_writer(&self) -> xml::writer::Result<EventWriter<Vec<u8>>> {
+        let mut writer = EventWriter::new(Vec::new());
+        self.append_to_writer(&mut writer)?;
+        Ok(writer)
+    }
+
+    pub fn append_to_writer<'b, T: std::io::Write + 'b>(
+        &self,
+        writer: &'b mut EventWriter<T>,
+    ) -> xml::writer::Result<()> {
+        self.visit_attributes(|attributes| {
+            writer.write(xml::writer::XmlEvent::StartElement {
+                name: xml::name::Name::local("OpenDRIVE"),
+                attributes,
+                namespace: std::borrow::Cow::Owned(xml::namespace::Namespace::empty()),
+            })
+        })?;
+        self.visit_children(|event| writer.write(event))?;
+        writer.write(xml::writer::XmlEvent::EndElement { name: None })?;
+        Ok(())
+    }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor, "xmlns" => &self.xmlns)
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor, "header" => self.header);
+        for road in &self.roads {
+            visit_children!(visitor, "road" => road);
+        }
+        Ok(())
+    }
 }
 
 impl Default for OpenDrive {
@@ -80,7 +124,7 @@ impl OpenDrive {
 }
 
 /// The `<header>` element is the very first element within the `<OpenDRIVE>` element.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Header {
     pub rev_major: u16,
     pub rev_minor: u16,
@@ -131,6 +175,77 @@ impl Header {
             vendor: find_map_parse_attr!(attributes, "vendor", Option<String>)?,
             geo_reference,
             offset,
+        })
+    }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes_flatten!(
+            visitor,
+            "revMajor" => Some(self.rev_major.to_string()).as_deref(),
+            "revMinor" => Some(self.rev_minor.to_string()).as_deref(),
+            "name" => self.name.as_deref(),
+            "version" => self.version.as_deref(),
+            "date" => self.date.as_deref(),
+            "north" => self.north.map(|v| v.value.to_scientific_string()).as_deref(),
+            "south" => self.south.map(|v| v.value.to_scientific_string()).as_deref(),
+            "east" => self.east.map(|v| v.value.to_scientific_string()).as_deref(),
+            "west" => self.west.map(|v| v.value.to_scientific_string()).as_deref(),
+            "vendor" => self.vendor.as_deref(),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        if let Some(geo_reference) = &self.geo_reference {
+            visit_children!(visitor, "geoReference" => geo_reference);
+        }
+        if let Some(offset) = &self.offset {
+            visit_children!(visitor, "offset" => offset);
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Header {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            rev_major: u.arbitrary()?,
+            rev_minor: u.arbitrary()?,
+            name: u.arbitrary()?,
+            version: u.arbitrary()?,
+            date: u.arbitrary()?,
+            north: if u.arbitrary()? {
+                Some(Length::new::<meter>(u.not_nan_f64()?))
+            } else {
+                None
+            },
+            south: if u.arbitrary()? {
+                Some(Length::new::<meter>(u.not_nan_f64()?))
+            } else {
+                None
+            },
+            east: if u.arbitrary()? {
+                Some(Length::new::<meter>(u.not_nan_f64()?))
+            } else {
+                None
+            },
+            west: if u.arbitrary()? {
+                Some(Length::new::<meter>(u.not_nan_f64()?))
+            } else {
+                None
+            },
+            vendor: u.arbitrary()?,
+            geo_reference: u.arbitrary()?,
+            offset: u.arbitrary()?,
         })
     }
 }
@@ -190,7 +305,8 @@ impl Header {
 /// it may contain characters that interfere with the XML syntax of an element’s attribute.
 /// In ASAM OpenDRIVE, the information about the geographic reference of an ASAM OpenDRIVE dataset
 /// is represented by the `<geoReference>` element within the `<header>` element.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct GeoReference {
     // TODO pub additional_data: Vec<AdditionalData>,
 }
@@ -204,6 +320,23 @@ impl GeoReference {
         find_map_parse_elem!(events);
         Ok(Self {})
     }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(visitor)
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
 }
 
 /// To avoid large coordinates, an offset of the whole dataset may be applied using the `<offset>`
@@ -211,7 +344,7 @@ impl GeoReference {
 /// translated by @x, @y, and @z. Afterwards, it is rotated by @hdg around the new origin. Rotation
 /// around the z-axis should be avoided. In ASAM OpenDRIVE, the offset of a database is represented
 /// by the `<offset>` element within the `<header>` element.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Offset {
     /// Heading offset (rotation around resulting z-axis)
     pub hdg: Angle,
@@ -234,6 +367,42 @@ impl Offset {
             x: find_map_parse_attr!(attributes, "x", f64).map(Length::new::<meter>)?,
             y: find_map_parse_attr!(attributes, "y", f64).map(Length::new::<meter>)?,
             z: find_map_parse_attr!(attributes, "z", f64).map(Length::new::<meter>)?,
+        })
+    }
+
+    pub fn visit_attributes(
+        &self,
+        visitor: impl for<'b> FnOnce(
+            Cow<'b, [xml::attribute::Attribute<'b>]>,
+        ) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_attributes!(
+            visitor,
+            "hdg" => &self.hdg.value.to_scientific_string(),
+            "x" => &self.x.value.to_scientific_string(),
+            "y" => &self.y.value.to_scientific_string(),
+            "z" => &self.z.value.to_scientific_string(),
+        )
+    }
+
+    pub fn visit_children(
+        &self,
+        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
+    ) -> xml::writer::Result<()> {
+        visit_children!(visitor);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Offset {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::NotNan;
+        Ok(Self {
+            hdg: Angle::new::<radian>(u.not_nan_f64()?),
+            x: Length::new::<meter>(u.not_nan_f64()?),
+            y: Length::new::<meter>(u.not_nan_f64()?),
+            z: Length::new::<meter>(u.not_nan_f64()?),
         })
     }
 }
