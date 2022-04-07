@@ -30,7 +30,8 @@ impl PlanView {
 
         find_map_parse_elem!(
             events,
-            "geometry" true => |attributes| {
+            // TODO require at least one
+            "geometry" => |attributes| {
                 geometry.push(Geometry::from_events(events, attributes)?);
                 Ok(())
             }

@@ -4,13 +4,13 @@
 extern crate opendrive;
 
 use libfuzzer_sys::fuzz_target;
-use opendrive::road::lane::Lanes;
+use opendrive::road::Road;
 use opendrive::xml;
 use opendrive::xml::writer::XmlEvent;
 use opendrive::xml::{EventReader, EventWriter};
 use std::borrow::Cow;
 
-fuzz_target!(|data: Lanes| {
+fuzz_target!(|data: Road| {
     let mut bytes = Vec::new();
     let mut writer = EventWriter::new(&mut bytes);
 
@@ -33,7 +33,7 @@ fuzz_target!(|data: Lanes| {
         find_map_parse_elem!(
             events,
             "lanes" true => |attributes| {
-                let data_2 = Lanes::from_events(events, attributes)?;
+                let data_2 = Road::from_events(events, attributes)?;
                 if data != data_2 {
                     dbg!(core::str::from_utf8(&bytes).unwrap());
                 }

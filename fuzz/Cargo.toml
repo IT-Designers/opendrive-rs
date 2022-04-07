@@ -20,8 +20,8 @@ features = ["fuzzing"]
 members = ["."]
 
 [[bin]]
-name = "border_test_1"
-path = "fuzz_targets/border_test_1.rs"
+name = "fuzz_complete"
+path = "fuzz_targets/fuzz_complete.rs"
 test = false
 doc = false
 
