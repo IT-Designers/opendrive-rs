@@ -16,7 +16,7 @@ fuzz_target!(|data: Road| {
 
     data.visit_attributes(|attributes| {
         writer.write(XmlEvent::StartElement {
-            name: xml::name::Name::local("lanes"),
+            name: xml::name::Name::local("road"),
             attributes: attributes,
             namespace: Cow::Owned(xml::namespace::Namespace::empty()),
         })
@@ -32,7 +32,7 @@ fuzz_target!(|data: Road| {
     let _ = (|| {
         find_map_parse_elem!(
             events,
-            "lanes" true => |attributes| {
+            "road" true => |attributes| {
                 let data_2 = Road::from_events(events, attributes)?;
                 if data != data_2 {
                     dbg!(core::str::from_utf8(&bytes).unwrap());
