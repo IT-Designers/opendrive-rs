@@ -3,7 +3,6 @@ use crate::road::geometry::PlanView;
 use crate::road::lane::Lanes;
 use crate::road::profile::{ElevationProfile, LateralProfile};
 use std::borrow::Cow;
-use std::str::FromStr;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 use xml::attribute::OwnedAttribute;

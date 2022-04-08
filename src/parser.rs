@@ -241,7 +241,7 @@ macro_rules! impl_from_str_as_str {
             }
         }
 
-        impl FromStr for $ty {
+        impl core::str::FromStr for $ty {
             type Err = $crate::parser::Error;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {

@@ -1,3 +1,4 @@
+use crate::road::lane::mark::RoadMark;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
@@ -513,7 +514,7 @@ impl RightLane {
 pub struct Lane {
     pub link: Option<LaneLink>,
     pub choice: Vec<LaneChoice>,
-    // pub road_mark: Vec<RoadMark>,
+    pub road_mark: Vec<RoadMark>,
     // TODO
     //     // pub material: Vec<Material>, // TODO
     //     // pub speed: Vec<Speed>, // TODO
@@ -529,6 +530,7 @@ impl Lane {
     ) -> Result<Self, crate::parser::Error> {
         let mut link = None;
         let mut choice = Vec::new();
+        let mut road_mark = Vec::new();
 
         find_map_parse_elem!(
             events,
@@ -544,9 +546,17 @@ impl Lane {
                 choice.push(LaneChoice::Width(Width::from_events(events, attributes)?));
                 Ok(())
             },
+            "roadMark" => |attributes| {
+                road_mark.push(RoadMark::from_events(events, attributes)?);
+                Ok(())
+            },
         );
 
-        Ok(Self { link, choice })
+        Ok(Self {
+            link,
+            choice,
+            road_mark,
+        })
     }
 
     pub fn visit_attributes(
@@ -570,6 +580,9 @@ impl Lane {
                 LaneChoice::Border(border) => visit_children!(visitor, "border" => border),
                 LaneChoice::Width(width) => visit_children!(visitor, "width" => width),
             }
+        }
+        for road_mark in &self.road_mark {
+            visit_children!(visitor, "roadMark" => road_mark);
         }
         Ok(())
     }

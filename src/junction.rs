@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 #[derive(Debug, Clone)]
 pub enum ConnectionType {
     Default,
