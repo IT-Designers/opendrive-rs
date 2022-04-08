@@ -82,14 +82,35 @@ impl RoadMark {
             Cow<'b, [xml::attribute::Attribute<'b>]>,
         ) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
-        visit_attributes!(visitor)
+        visit_attributes_flatten!(
+            visitor,
+            "color" => Some(self.color.as_str()),
+            "height" => self.height.map(|v| v.value.to_scientific_string()).as_deref(),
+            "laneChange" => self.lane_change.as_ref().map(LaneChange::as_str),
+            "material" => self.material.as_deref(),
+            "sOffset" => Some(self.s_offset.value.to_scientific_string()).as_deref(),
+            "type" => Some(self.type_simplified.as_str()),
+            "weight" => self.weight.as_ref().map(Weight::as_str),
+            "width" => self.width.map(|v| v.value.to_scientific_string()).as_deref(),
+        )
     }
 
     pub fn visit_children(
         &self,
         mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
-        visit_children!(visitor);
+        for sway in &self.sway {
+            visit_children!(visitor, "sway" => sway);
+        }
+
+        if let Some(r#type) = &self.r#type {
+            visit_children!(visitor, "type" => r#type);
+        }
+
+        if let Some(explicit) = &self.explicit {
+            visit_children!(visitor, "explicit" => explicit);
+        }
+
         Ok(())
     }
 }
