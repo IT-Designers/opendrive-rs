@@ -11,10 +11,9 @@ use xml::{EventReader, EventWriter};
 
 pub mod additional_data;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct OpenDrive {
-    pub xmlns: String,
     pub header: Header,
     pub roads: Vec<Road>,
 }
@@ -39,7 +38,7 @@ impl OpenDrive {
 
     pub fn from_events(
         events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
+        _attributes: Vec<OwnedAttribute>,
     ) -> Result<Self, crate::parser::Error> {
         let mut header = None;
         let mut roads = Vec::new();
@@ -57,8 +56,6 @@ impl OpenDrive {
         );
 
         Ok(Self {
-            xmlns: find_map_parse_attr!(attributes, "xmlns", Option<String>)?
-                .unwrap_or_else(Self::default_xmlns),
             header: header.unwrap(),
             roads,
         })
@@ -74,6 +71,11 @@ impl OpenDrive {
         &self,
         writer: &'b mut EventWriter<T>,
     ) -> xml::writer::Result<()> {
+        writer.write(xml::writer::XmlEvent::StartDocument {
+            version: xml::common::XmlVersion::Version10,
+            encoding: None,
+            standalone: Some(true),
+        })?;
         self.visit_attributes(|attributes| {
             writer.write(xml::writer::XmlEvent::StartElement {
                 name: xml::name::Name::local("OpenDRIVE"),
@@ -92,7 +94,7 @@ impl OpenDrive {
             Cow<'b, [xml::attribute::Attribute<'b>]>,
         ) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
-        visit_attributes!(visitor, "xmlns" => &self.xmlns)
+        visit_attributes!(visitor)
     }
 
     pub fn visit_children(
@@ -104,22 +106,6 @@ impl OpenDrive {
             visit_children!(visitor, "road" => road);
         }
         Ok(())
-    }
-}
-
-impl Default for OpenDrive {
-    fn default() -> Self {
-        Self {
-            xmlns: Self::default_xmlns(),
-            header: Header::default(),
-            roads: Vec::default(),
-        }
-    }
-}
-
-impl OpenDrive {
-    pub fn default_xmlns() -> String {
-        "https://code.asam.net/simulation/standard/opendrive_schema/".to_string()
     }
 }
 

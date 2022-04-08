@@ -9,7 +9,13 @@ fuzz_target!(|data: OpenDrive| {
     let bytes = writer.into_inner();
 
     let reader = EventReader::from_str(core::str::from_utf8(&bytes).unwrap());
-    let data_2 = OpenDrive::from_reader(reader).unwrap();
+    let data_2 = OpenDrive::from_reader(reader);
+
+    if data_2.is_err() {
+        dbg!(core::str::from_utf8(&bytes).unwrap());
+    }
+
+    let data_2 = data_2.unwrap();
 
     if data != data_2 {
         dbg!(core::str::from_utf8(&bytes).unwrap());
