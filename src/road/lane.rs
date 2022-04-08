@@ -1,4 +1,5 @@
 use crate::road::lane::mark::RoadMark;
+use crate::road::lane::material::Material;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
@@ -6,6 +7,7 @@ use xml::attribute::OwnedAttribute;
 use xml::reader::XmlEvent;
 
 pub mod mark;
+pub mod material;
 
 /// Contains a series of lane section elements that define the characteristics of the road cross
 /// sections with respect to the lanes along the reference line.
@@ -515,8 +517,8 @@ pub struct Lane {
     pub link: Option<LaneLink>,
     pub choice: Vec<LaneChoice>,
     pub road_mark: Vec<RoadMark>,
+    pub material: Vec<Material>,
     // TODO
-    //     // pub material: Vec<Material>, // TODO
     //     // pub speed: Vec<Speed>, // TODO
     //     // pub access: Vec<Access>, // TODO
     //     // pub height: Vec<Height>, // TODO
@@ -531,6 +533,7 @@ impl Lane {
         let mut link = None;
         let mut choice = Vec::new();
         let mut road_mark = Vec::new();
+        let mut material = Vec::new();
 
         find_map_parse_elem!(
             events,
@@ -550,12 +553,17 @@ impl Lane {
                 road_mark.push(RoadMark::from_events(events, attributes)?);
                 Ok(())
             },
+            "material" => |attributes| {
+                material.push(Material::from_events(events, attributes)?);
+                Ok(())
+            },
         );
 
         Ok(Self {
             link,
             choice,
             road_mark,
+            material,
         })
     }
 
@@ -575,15 +583,22 @@ impl Lane {
         if let Some(link) = &self.link {
             visit_children!(visitor, "link" => link);
         }
+
         for choice in &self.choice {
             match choice {
                 LaneChoice::Border(border) => visit_children!(visitor, "border" => border),
                 LaneChoice::Width(width) => visit_children!(visitor, "width" => width),
             }
         }
+
         for road_mark in &self.road_mark {
             visit_children!(visitor, "roadMark" => road_mark);
         }
+
+        for material in &self.material {
+            visit_children!(visitor, "material" => material);
+        }
+
         Ok(())
     }
 }
