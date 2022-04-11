@@ -302,7 +302,7 @@ impl LeftLane {
     ) -> Result<Self, crate::parser::Error> {
         Ok(Self {
             id: find_map_parse_attr!(attributes, "id", i64)?,
-            base: Lane::from_events(events, Vec::new())?,
+            base: Lane::from_events(events, attributes)?,
         })
     }
 
@@ -395,7 +395,7 @@ impl CenterLane {
     ) -> Result<Self, crate::parser::Error> {
         Ok(Self {
             id: find_map_parse_attr!(attributes, "id", i64)?,
-            base: Lane::from_events(events, Vec::new())?,
+            base: Lane::from_events(events, attributes)?,
         })
     }
 
@@ -488,7 +488,7 @@ impl RightLane {
     ) -> Result<Self, crate::parser::Error> {
         Ok(Self {
             id: find_map_parse_attr!(attributes, "id", i64)?,
-            base: Lane::from_events(events, Vec::new())?,
+            base: Lane::from_events(events, attributes)?,
         })
     }
 
@@ -530,14 +530,17 @@ pub struct Lane {
     pub access: Vec<Access>,
     pub height: Vec<Height>,
     pub rule: Vec<Rule>,
-    // TODO level
-    // TODO lane type
+    /// - `true` = keep lane on level, that is, do not apply superelevation;
+    /// - `false` = apply superelevation to this lane (default, also used if attribute level is missing)
+    pub level: Option<bool>,
+    /// Type of the lane
+    pub r#type: Type,
 }
 
 impl Lane {
     pub fn from_events(
         events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
+        attributes: Vec<OwnedAttribute>,
     ) -> Result<Self, crate::parser::Error> {
         let mut link = None;
         let mut choice = Vec::new();
@@ -597,6 +600,8 @@ impl Lane {
             access,
             height,
             rule,
+            level: find_map_parse_attr!(attributes, "level", Option<bool>)?,
+            r#type: find_map_parse_attr!(attributes, "type", Type)?,
         })
     }
 
@@ -606,7 +611,11 @@ impl Lane {
             Cow<'b, [xml::attribute::Attribute<'b>]>,
         ) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
-        visit_attributes!(visitor)
+        visit_attributes_flatten!(
+            visitor,
+            "level" => self.level.map(|v| v.to_string()).as_deref(),
+            "type" => Some(self.r#type.as_str()),
+        )
     }
 
     pub fn visit_children(
@@ -920,3 +929,83 @@ impl arbitrary::Arbitrary<'_> for Width {
         })
     }
 }
+
+/// The lane type is defined per lane. A lane type defines the main purpose of a lane and its
+/// corresponding traffic rules.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub enum Type {
+    /// Describes a soft shoulder  at the edge of the roa
+    Shoulder,
+    /// Describes a hard border at the edge of the road. has the same height as the drivable lane
+    Border,
+    /// “normal” drivable road, which is not one of the other type
+    Driving,
+    /// Hard shoulder on motorways for emergency stop
+    Stop,
+    /// "Invisible" lane. This lane is on the most ouside of the road. Its only purpose is for simulation, that there is still opendrive present in case the (human) driver leaves the road.
+    None,
+    /// Lane on which cars should not drive, but have the same height as the drivable lanes. Typically they are separated with lines and often there are additional striped lines on them.
+    Restricted,
+    /// Lane with parking space
+    Parking,
+    /// Lane between driving lanes in oposite directions. Typically used in towns on large roads, to separate the traffic
+    Median,
+    /// Lane reserved for Cyclists
+    Biking,
+    /// Lane on which pedestrians can walk savel
+    Sidewalk,
+    /// Lane "curb" is used for curbstones. These have a different height compared to the drivable lanes
+    Curb,
+    /// Lane Type „exit“ is used for the sections which is parallel to the main road (meaning deceleration lanes)
+    Exit,
+    /// Lane Type „entry“ is used for the sections which is parallel to the main road (meaning acceleration lane
+    Entry,
+    /// A ramp leading to a motorway from rural/urban roads is an „onRamp“.
+    OnRamp,
+    /// A ramp leading away from a motorway and onto rural/urban roads is an „offRamp”.
+    OffRamp,
+    /// A ramp connecting two motorways is a „connectingRamp“ (e.g. motorway junction
+    ConnectingRamp,
+    /// this lane type has two use cases: a) only driving lane on a narrow road which may be used in both directions; b) continuous two-way left turn lane on multi-lane roads – US road network
+    Bidirectional,
+    Special1,
+    Special2,
+    Special3,
+    RoadWorks,
+    Tram,
+    Rail,
+    Bus,
+    Taxi,
+    HOV,
+}
+
+impl_from_str_as_str!(
+    Type,
+    "shoulder" => Shoulder,
+    "border" => Border,
+    "driving" => Driving,
+    "stop" => Stop,
+    "none" => None,
+    "restricted" => Restricted,
+    "parking" => Parking,
+    "median" => Median,
+    "biking" => Biking,
+    "sidewalk" => Sidewalk,
+    "curb" => Curb,
+    "exit" => Exit,
+    "entry" => Entry,
+    "onRamp" => OnRamp,
+    "offRamp" => OffRamp,
+    "connectingRamp" => ConnectingRamp,
+    "bidirectional" => Bidirectional,
+    "special1" => Special1,
+    "special2" => Special2,
+    "special3" => Special3,
+    "roadWorks" => RoadWorks,
+    "tram" => Tram,
+    "rail" => Rail,
+    "bus" => Bus,
+    "taxi" => Taxi,
+    "HOV" => HOV,
+);
