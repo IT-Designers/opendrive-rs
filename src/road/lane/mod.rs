@@ -2,6 +2,7 @@ use crate::road::lane::access::Access;
 use crate::road::lane::height::Height;
 use crate::road::lane::mark::RoadMark;
 use crate::road::lane::material::Material;
+use crate::road::lane::rule::Rule;
 use crate::road::lane::speed::Speed;
 use std::borrow::Cow;
 use uom::si::f64::Length;
@@ -13,6 +14,7 @@ pub mod access;
 pub mod height;
 pub mod mark;
 pub mod material;
+pub mod rule;
 pub mod speed;
 
 /// Contains a series of lane section elements that define the characteristics of the road cross
@@ -527,10 +529,9 @@ pub struct Lane {
     pub speed: Vec<Speed>,
     pub access: Vec<Access>,
     pub height: Vec<Height>,
-    // TODO
-    //     // pub rule: Vec<Rule>, // TODO
-    // level
-    // lane type
+    pub rule: Vec<Rule>,
+    // TODO level
+    // TODO lane type
 }
 
 impl Lane {
@@ -545,6 +546,7 @@ impl Lane {
         let mut speed = Vec::new();
         let mut access = Vec::new();
         let mut height = Vec::new();
+        let mut rule = Vec::new();
 
         find_map_parse_elem!(
             events,
@@ -580,6 +582,10 @@ impl Lane {
                 height.push(Height::from_events(events, attributes)?);
                 Ok(())
             },
+            "rule" => |attributes| {
+                rule.push(Rule::from_events(events, attributes)?);
+                Ok(())
+            },
         );
 
         Ok(Self {
@@ -590,6 +596,7 @@ impl Lane {
             speed,
             access,
             height,
+            rule,
         })
     }
 
@@ -635,6 +642,10 @@ impl Lane {
 
         for height in &self.height {
             visit_children!(visitor, "height" => height);
+        }
+
+        for rule in &self.rule {
+            visit_children!(visitor, "rule" => rule);
         }
 
         Ok(())
