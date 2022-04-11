@@ -8,10 +8,15 @@ use xml::reader::XmlEvent;
 /// defined. If multiple elements are defined, they must be listed in ascending order.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
+    /// Friction coefficient
     pub friction: f64,
+    /// Roughness, for example, for sound and motion systems
     pub roughness: Option<f64>,
+    /// s-coordinate of start position, relative to the position of the preceding `<laneSection>`
+    /// element
     pub s_offset: Length,
-    pub surface: String,
+    /// Surface material code, depending on application
+    pub surface: Option<String>,
 }
 
 impl Material {
@@ -25,7 +30,7 @@ impl Material {
             friction: find_map_parse_attr!(attributes, "friction", f64)?,
             roughness: find_map_parse_attr!(attributes, "roughness", Option<f64>)?,
             s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
-            surface: find_map_parse_attr!(attributes, "surface", String)?,
+            surface: find_map_parse_attr!(attributes, "surface", Option<String>)?,
         })
     }
 
@@ -40,7 +45,7 @@ impl Material {
             "friction" => Some(self.friction.to_scientific_string()).as_deref(),
             "roughness" => self.roughness.map(|v| v.to_scientific_string()).as_deref(),
             "sOffset" => Some(self.s_offset.value.to_scientific_string()).as_deref(),
-            "surface" => Some(self.surface.as_str()),
+            "surface" => self.surface.as_deref(),
         )
     }
 
