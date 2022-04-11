@@ -1,3 +1,4 @@
+use backtrace::Backtrace;
 use std::convert::Infallible;
 use std::num::{ParseFloatError, ParseIntError};
 use std::str::ParseBoolError;
@@ -6,10 +7,16 @@ use std::str::ParseBoolError;
 pub enum Error {
     #[error("XML parsing failed: {0}")]
     XmlError(#[from] xml::reader::Error),
-    #[error("The required attribute `{0} is missing")]
-    AttributeMissing(String),
-    #[error("The required element `{0} is missing")]
-    ElementMissing(String),
+    #[error("The required attribute `{name} is missing")]
+    AttributeMissing {
+        name: String,
+        backtrace: Box<Backtrace>,
+    },
+    #[error("The required element `{name} is missing")]
+    ElementMissing {
+        name: String,
+        backtrace: Box<Backtrace>,
+    },
     #[error("A child element in `{0} is missing")]
     ChildElementIsMissing(String),
     #[error("Failed to parse value for attribute `{0}`: {1}")]
@@ -27,6 +34,22 @@ impl Error {
         Self::InvalidValueFor {
             name: core::any::type_name::<T>().to_string(),
             value: value.into(),
+        }
+    }
+
+    #[inline]
+    pub fn missing_attribute(attribute_name: impl Into<String>) -> Self {
+        Self::AttributeMissing {
+            name: attribute_name.into(),
+            backtrace: Box::new(Backtrace::new()),
+        }
+    }
+
+    #[inline]
+    pub fn missing_element(element_name: impl Into<String>) -> Self {
+        Self::ElementMissing {
+            name: element_name.into(),
+            backtrace: Box::new(Backtrace::new()),
         }
     }
 }
@@ -94,7 +117,7 @@ macro_rules! find_map_parse_attr {
     };
     ($attrs:ident, $name:literal, $ty:ty) => {
         find_map_parse_attr!($attrs, $name, Option<$ty>).and_then(|v| {
-            v.ok_or_else(|| $crate::parser::Error::AttributeMissing($name.to_string()))
+            v.ok_or_else(|| $crate::parser::Error::missing_attribute($name.to_string()))
         })
     };
 }
@@ -164,7 +187,7 @@ macro_rules! find_map_parse_elem {
             if __fields[__index] {
                 $(
                     let _: bool = $req;
-                    return Err($crate::parser::Error::ElementMissing(stringify!($name).to_string()))
+                    return Err($crate::parser::Error::missing_element($name.to_string()))
                 )?
             }
             __index += 1;
