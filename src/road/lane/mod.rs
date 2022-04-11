@@ -1,5 +1,6 @@
 use crate::road::lane::mark::RoadMark;
 use crate::road::lane::material::Material;
+use crate::road::lane::speed::Speed;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
@@ -8,6 +9,7 @@ use xml::reader::XmlEvent;
 
 pub mod mark;
 pub mod material;
+pub mod speed;
 
 /// Contains a series of lane section elements that define the characteristics of the road cross
 /// sections with respect to the lanes along the reference line.
@@ -518,11 +520,12 @@ pub struct Lane {
     pub choice: Vec<LaneChoice>,
     pub road_mark: Vec<RoadMark>,
     pub material: Vec<Material>,
+    pub speed: Vec<Speed>,
     // TODO
-    //     // pub speed: Vec<Speed>, // TODO
     //     // pub access: Vec<Access>, // TODO
     //     // pub height: Vec<Height>, // TODO
     //     // pub rule: Vec<Rule>, // TODO
+    // lane type
 }
 
 impl Lane {
@@ -534,6 +537,7 @@ impl Lane {
         let mut choice = Vec::new();
         let mut road_mark = Vec::new();
         let mut material = Vec::new();
+        let mut speed = Vec::new();
 
         find_map_parse_elem!(
             events,
@@ -557,6 +561,10 @@ impl Lane {
                 material.push(Material::from_events(events, attributes)?);
                 Ok(())
             },
+            "speed" => |attributes| {
+                speed.push(Speed::from_events(events, attributes)?);
+                Ok(())
+            },
         );
 
         Ok(Self {
@@ -564,6 +572,7 @@ impl Lane {
             choice,
             road_mark,
             material,
+            speed,
         })
     }
 
@@ -597,6 +606,10 @@ impl Lane {
 
         for material in &self.material {
             visit_children!(visitor, "material" => material);
+        }
+
+        for speed in &self.speed {
+            visit_children!(visitor, "speed" => speed);
         }
 
         Ok(())
