@@ -8,10 +8,10 @@ use xml::reader::XmlEvent;
 /// defined. If multiple elements are defined, they must be listed in ascending order.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
-    friction: f64,
-    roughness: Option<f64>,
-    s_offset: Length,
-    surface: String,
+    pub friction: f64,
+    pub roughness: Option<f64>,
+    pub s_offset: Length,
+    pub surface: String,
 }
 
 impl Material {
