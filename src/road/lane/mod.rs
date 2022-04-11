@@ -1,4 +1,5 @@
 use crate::road::lane::access::Access;
+use crate::road::lane::height::Height;
 use crate::road::lane::mark::RoadMark;
 use crate::road::lane::material::Material;
 use crate::road::lane::speed::Speed;
@@ -9,6 +10,7 @@ use xml::attribute::OwnedAttribute;
 use xml::reader::XmlEvent;
 
 pub mod access;
+pub mod height;
 pub mod mark;
 pub mod material;
 pub mod speed;
@@ -524,8 +526,8 @@ pub struct Lane {
     pub material: Vec<Material>,
     pub speed: Vec<Speed>,
     pub access: Vec<Access>,
+    pub height: Vec<Height>,
     // TODO
-    //     // pub height: Vec<Height>, // TODO
     //     // pub rule: Vec<Rule>, // TODO
     // level
     // lane type
@@ -542,6 +544,7 @@ impl Lane {
         let mut material = Vec::new();
         let mut speed = Vec::new();
         let mut access = Vec::new();
+        let mut height = Vec::new();
 
         find_map_parse_elem!(
             events,
@@ -572,7 +575,11 @@ impl Lane {
             "access" => |attributes| {
                 access.push(Access::from_events(events, attributes)?);
                 Ok(())
-            }
+            },
+            "height" => |attributes| {
+                height.push(Height::from_events(events, attributes)?);
+                Ok(())
+            },
         );
 
         Ok(Self {
@@ -582,6 +589,7 @@ impl Lane {
             material,
             speed,
             access,
+            height,
         })
     }
 
@@ -623,6 +631,10 @@ impl Lane {
 
         for access in &self.access {
             visit_children!(visitor, "access" => access);
+        }
+
+        for height in &self.height {
+            visit_children!(visitor, "height" => height);
         }
 
         Ok(())
