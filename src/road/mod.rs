@@ -1,6 +1,7 @@
 use crate::junction::{ContactPoint, ElementDir};
 use crate::road::geometry::PlanView;
 use crate::road::lane::Lanes;
+use crate::road::objects::Objects;
 use crate::road::profile::{ElevationProfile, LateralProfile};
 use std::borrow::Cow;
 use uom::si::f64::Length;
@@ -10,6 +11,7 @@ use xml::reader::XmlEvent;
 
 pub mod geometry;
 pub mod lane;
+pub mod objects;
 pub mod profile;
 
 /// In ASAM OpenDRIVE, the road network is represented by `<road>` elements. Each road runs along
@@ -43,7 +45,7 @@ pub struct Road {
     pub elevation_profile: Option<ElevationProfile>,
     pub lateral_profile: Option<LateralProfile>,
     pub lanes: Lanes,
-    // pub objects: (),
+    pub objects: Option<Objects>,
     // pub signals: (),
     // pub surface: (),
     // pub raildroad: (),
@@ -58,6 +60,7 @@ impl Road {
         let mut elevation_profile = None;
         let mut lateral_profile = None;
         let mut lanes = None;
+        let mut objects = None;
 
         find_map_parse_elem!(
             events,
@@ -80,6 +83,10 @@ impl Road {
             "lanes" true => |attributes| {
                 lanes = Some(Lanes::from_events(events, attributes)?);
                 Ok(())
+            },
+            "objects" => |attributes| {
+                objects = Some(Objects::from_events(events, attributes)?);
+                Ok(())
             }
         );
 
@@ -94,6 +101,7 @@ impl Road {
             elevation_profile,
             lateral_profile,
             lanes: lanes.unwrap(),
+            objects,
         })
     }
 
@@ -129,6 +137,10 @@ impl Road {
             visit_children!(visitor, "lateralProfile" => lateral);
         }
 
+        if let Some(objects) = &self.objects {
+            visit_children!(visitor, "objects" => objects);
+        }
+
         visit_children!(
             visitor,
             "planView" => self.plan_view,
@@ -154,6 +166,7 @@ impl arbitrary::Arbitrary<'_> for Road {
             elevation_profile: u.arbitrary()?,
             lateral_profile: u.arbitrary()?,
             lanes: u.arbitrary()?,
+            objects: u.arbitrary()?,
         })
     }
 }

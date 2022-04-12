@@ -267,6 +267,7 @@ macro_rules! impl_from_str_as_str {
         impl core::str::FromStr for $ty {
             type Err = $crate::parser::Error;
 
+            #[allow(deprecated)]
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
                     $(_ if s.eq_ignore_ascii_case(Self::$value.as_str()) => Ok(Self::$value),)*

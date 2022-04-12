@@ -534,7 +534,7 @@ pub struct Lane {
     /// - `false` = apply superelevation to this lane (default, also used if attribute level is missing)
     pub level: Option<bool>,
     /// Type of the lane
-    pub r#type: Type,
+    pub r#type: LaneType,
 }
 
 impl Lane {
@@ -601,7 +601,7 @@ impl Lane {
             height,
             rule,
             level: find_map_parse_attr!(attributes, "level", Option<bool>)?,
-            r#type: find_map_parse_attr!(attributes, "type", Type)?,
+            r#type: find_map_parse_attr!(attributes, "type", LaneType)?,
         })
     }
 
@@ -934,7 +934,7 @@ impl arbitrary::Arbitrary<'_> for Width {
 /// corresponding traffic rules.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum Type {
+pub enum LaneType {
     /// Describes a soft shoulder  at the edge of the roa
     Shoulder,
     /// Describes a hard border at the edge of the road. has the same height as the drivable lane
@@ -981,7 +981,7 @@ pub enum Type {
 }
 
 impl_from_str_as_str!(
-    Type,
+    LaneType,
     "shoulder" => Shoulder,
     "border" => Border,
     "driving" => Driving,
