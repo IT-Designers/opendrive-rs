@@ -5,6 +5,7 @@ use crate::road::objects::parking::ParkingSpace;
 use crate::road::objects::reference::ObjectReference;
 use crate::road::objects::repeat::Repeat;
 use crate::road::objects::surface::Surface;
+use crate::road::objects::tunnel::Tunnel;
 use crate::road::objects::validity::LaneValidity;
 use std::borrow::Cow;
 use uom::si::angle::radian;
@@ -21,6 +22,7 @@ pub mod parking;
 pub mod reference;
 pub mod repeat;
 pub mod surface;
+pub mod tunnel;
 pub mod validity;
 
 /// Container for all objects along a road
