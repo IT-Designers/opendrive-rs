@@ -38,7 +38,7 @@ impl Outlines {
             Cow<'b, [xml::attribute::Attribute<'b>]>,
         ) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
-        visit_attributes_flatten!(visitor)
+        visit_attributes!(visitor)
     }
 
     pub fn visit_children(
