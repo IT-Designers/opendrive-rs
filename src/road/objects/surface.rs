@@ -33,7 +33,7 @@ impl Surface {
             Cow<'b, [xml::attribute::Attribute<'b>]>,
         ) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
-        visit_attributes_flatten!(visitor)
+        visit_attributes!(visitor)
     }
 
     pub fn visit_children(
@@ -108,7 +108,7 @@ impl arbitrary::Arbitrary<'_> for Crg {
             file: u.arbitrary()?,
             hide_road_surface_crg: u.arbitrary()?,
             z_scale: u
-                .arbitrary::<Option<()>>()
+                .arbitrary::<Option<()>>()?
                 .map(|_| u.not_nan_f64())
                 .transpose()?,
         })
