@@ -17,7 +17,7 @@ pub struct Outlines {
 impl Outlines {
     pub fn from_events(
         events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
+        _attributes: Vec<OwnedAttribute>,
     ) -> Result<Self, crate::parser::Error> {
         let mut outline = Vec::new();
 

@@ -1,3 +1,4 @@
+use crate::road::objects::bridge::Bridge;
 use crate::road::objects::markings::Markings;
 use crate::road::objects::material::Material;
 use crate::road::objects::outline::{Outline, Outlines};
@@ -15,6 +16,7 @@ use uom::si::length::meter;
 use xml::attribute::OwnedAttribute;
 use xml::reader::XmlEvent;
 
+pub mod bridge;
 pub mod markings;
 pub mod material;
 pub mod outline;

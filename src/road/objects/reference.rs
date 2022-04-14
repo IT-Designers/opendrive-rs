@@ -78,7 +78,7 @@ impl ObjectReference {
         &self,
         mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
-        for validity in self.validity {
+        for validity in &self.validity {
             visit_children!(visitor, "validity" => validity);
         }
         Ok(())
