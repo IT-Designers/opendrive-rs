@@ -7,6 +7,7 @@ use crate::road::lane::speed::Speed;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
+use vec1::Vec1;
 use xml::attribute::OwnedAttribute;
 use xml::reader::XmlEvent;
 
@@ -20,10 +21,9 @@ pub mod speed;
 /// Contains a series of lane section elements that define the characteristics of the road cross
 /// sections with respect to the lanes along the reference line.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Lanes {
     pub lane_offset: Vec<Offset>,
-    pub lane_section: Vec<Section>,
+    pub lane_section: Vec1<Section>,
 }
 
 impl Lanes {
@@ -40,7 +40,7 @@ impl Lanes {
                 lane_offset.push(Offset::from_events(events, attributes)?);
                 Ok(())
             },
-            "laneSection" => |attributes| {
+            "laneSection" true => |attributes| {
                 lane_section.push(Section::from_events(events, attributes)?);
                 Ok(())
             },
@@ -48,7 +48,8 @@ impl Lanes {
 
         Ok(Self {
             lane_offset,
-            lane_section,
+            lane_section: Vec1::try_from_vec(lane_section)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
         })
     }
 
@@ -72,6 +73,20 @@ impl Lanes {
             visit_children!(visitor, "laneSection" => lane_section);
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Lanes {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            lane_offset: u.arbitrary()?,
+            lane_section: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+        })
     }
 }
 
@@ -242,9 +257,8 @@ impl arbitrary::Arbitrary<'_> for Section {
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Left {
-    pub lane: Vec<LeftLane>,
+    pub lane: Vec1<LeftLane>,
 }
 
 impl Left {
@@ -256,13 +270,16 @@ impl Left {
 
         find_map_parse_elem!(
             events,
-            "lane" => |attributes| {
+            "lane" true => |attributes| {
                 lane.push(LeftLane::from_events(events, attributes)?);
                 Ok(())
             }
         );
 
-        Ok(Self { lane })
+        Ok(Self {
+            lane: Vec1::try_from_vec(lane)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
+        })
     }
 
     pub fn visit_attributes(
@@ -282,6 +299,19 @@ impl Left {
             visit_children!(visitor, "lane" => lane);
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Left {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            lane: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+        })
     }
 }
 
@@ -335,9 +365,8 @@ impl LeftLane {
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Center {
-    pub lane: Vec<CenterLane>,
+    pub lane: Vec1<CenterLane>,
 }
 
 impl Center {
@@ -349,13 +378,16 @@ impl Center {
 
         find_map_parse_elem!(
             events,
-            "lane" => |attributes| {
+            "lane" true => |attributes| {
                 lane.push(CenterLane::from_events(events, attributes)?);
                 Ok(())
             }
         );
 
-        Ok(Self { lane })
+        Ok(Self {
+            lane: Vec1::try_from_vec(lane)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
+        })
     }
 
     pub fn visit_attributes(
@@ -375,6 +407,19 @@ impl Center {
             visit_children!(visitor, "lane" => lane);
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Center {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            lane: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+        })
     }
 }
 
@@ -428,9 +473,8 @@ impl CenterLane {
 /// section are grouped into left, center, and right lanes. Each lane section shall contain one
 /// `<center>` element and at least one `<right>` or `<left>` element.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Right {
-    pub lane: Vec<RightLane>,
+    pub lane: Vec1<RightLane>,
 }
 
 impl Right {
@@ -442,13 +486,16 @@ impl Right {
 
         find_map_parse_elem!(
             events,
-            "lane" => |attributes| {
+            "lane" true => |attributes| {
                 lane.push(RightLane::from_events(events, attributes)?);
                 Ok(())
             }
         );
 
-        Ok(Self { lane })
+        Ok(Self {
+            lane: Vec1::try_from_vec(lane)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
+        })
     }
 
     pub fn visit_attributes(
@@ -468,6 +515,19 @@ impl Right {
             visit_children!(visitor, "lane" => lane);
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Right {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            lane: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+        })
     }
 }
 
@@ -520,10 +580,9 @@ impl RightLane {
 /// Lane elements are included in left/center/right elements. Lane elements should represent the
 /// lanes from left to right, that is, with descending ID.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Lane {
     pub link: Option<LaneLink>,
-    pub choice: Vec<LaneChoice>,
+    pub choice: Vec1<LaneChoice>,
     pub road_mark: Vec<RoadMark>,
     pub material: Vec<Material>,
     pub speed: Vec<Speed>,
@@ -593,7 +652,8 @@ impl Lane {
 
         Ok(Self {
             link,
-            choice,
+            choice: Vec1::try_from_vec(choice)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
             road_mark,
             material,
             speed,
@@ -658,6 +718,28 @@ impl Lane {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Lane {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            link: u.arbitrary()?,
+            choice: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+            road_mark: u.arbitrary()?,
+            material: u.arbitrary()?,
+            speed: u.arbitrary()?,
+            access: u.arbitrary()?,
+            height: u.arbitrary()?,
+            rule: u.arbitrary()?,
+            level: u.arbitrary()?,
+            r#type: u.arbitrary()?,
+        })
     }
 }
 

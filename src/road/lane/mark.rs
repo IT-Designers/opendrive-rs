@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
+use vec1::Vec1;
 use xml::attribute::OwnedAttribute;
 use xml::reader::XmlEvent;
 
@@ -220,7 +221,7 @@ impl arbitrary::Arbitrary<'_> for Sway {
 /// about the lines that the road mark is composed of.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Type {
-    pub line: Vec<TypeLine>,
+    pub line: Vec1<TypeLine>,
     /// Name of the road mark type. May be chosen freely.
     pub name: String,
     /// Accumulated width of the road mark. In case of several `<line>` elements this @width is the
@@ -238,14 +239,15 @@ impl Type {
 
         find_map_parse_elem!(
             events,
-            "line" => |attributes| {
+            "line" true => |attributes| {
                 line.push(TypeLine::from_events(events, attributes)?);
                 Ok(())
             },
         );
 
         Ok(Self {
-            line,
+            line: Vec1::try_from_vec(line)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
             name: find_map_parse_attr!(attributes, "name", String)?,
             width: find_map_parse_attr!(attributes, "width", f64).map(Length::new::<meter>)?,
         })
@@ -280,7 +282,11 @@ impl arbitrary::Arbitrary<'_> for Type {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         use crate::fuzzing::NotNan;
         Ok(Self {
-            line: u.arbitrary()?,
+            line: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
             name: u.arbitrary()?,
             width: Length::new::<meter>(u.not_nan_f64()?),
         })
@@ -385,9 +391,8 @@ impl arbitrary::Arbitrary<'_> for TypeLine {
 /// within the `<explicit>` element.
 // The `<explicit>` element should specifically be used for measurement data.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Explicit {
-    line: Vec<ExplicitLine>,
+    pub line: Vec1<ExplicitLine>,
 }
 
 impl Explicit {
@@ -399,13 +404,16 @@ impl Explicit {
 
         find_map_parse_elem!(
             events,
-            "line" => |attributes| {
+            "line" true => |attributes| {
                 line.push(ExplicitLine::from_events(events, attributes)?);
                 Ok(())
             },
         );
 
-        Ok(Self { line })
+        Ok(Self {
+            line: Vec1::try_from_vec(line)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
+        })
     }
 
     pub fn visit_attributes(
@@ -425,6 +433,19 @@ impl Explicit {
             visit_children!(visitor, "line" => line);
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Explicit {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            line: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+        })
     }
 }
 

@@ -278,7 +278,7 @@ impl Object {
             "radius" => self.radius.map(|v| v.value.to_scientific_string()).as_deref(),
             "roll" => self.roll.map(|v| v.value.to_scientific_string()).as_deref(),
             "s" => Some(self.s.value.to_scientific_string()).as_deref(),
-            "subType" => self.subtype.as_deref(),
+            "subtype" => self.subtype.as_deref(),
             "t" => Some(self.t.value.to_scientific_string()).as_deref(),
             "type" => self.r#type.as_ref().map(ObjectType::as_str),
             "validLength" => self.valid_length.map(|v| v.value.to_scientific_string()).as_deref(),
@@ -295,7 +295,7 @@ impl Object {
             visit_children!(visitor, "repeat" => repeat);
         }
 
-        for outline in &self.outline {
+        if let Some(outline) = &self.outline {
             visit_children!(visitor, "outline" => outline);
         }
 

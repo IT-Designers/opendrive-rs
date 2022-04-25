@@ -45,7 +45,7 @@ impl OpenDrive {
 
         find_map_parse_elem!(
             events,
-            "header" true => |attributes| {
+            "header" => |attributes| {
                 header = Some(Header::from_events(events, attributes)?);
                 Ok(())
             },

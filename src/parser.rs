@@ -18,16 +18,26 @@ pub enum Error {
         backtrace: Box<Backtrace>,
     },
     #[error("A child element in `{0} is missing")]
-    ChildElementIsMissing(String),
-    #[error("Failed to parse value for attribute `{0}`: {1}")]
-    ParseError(String, ParseError),
+    ChildElementIsMissing(String, Box<Backtrace>),
+    #[error("Failed to parse value of field `{field}` to `{ty}`: {error}")]
+    ParseError {
+        path: String,
+        field: String,
+        ty: String,
+        error: ParseError,
+        bt: Box<Backtrace>,
+    },
     #[error("Invalid value for `{name}`: {value}")]
     InvalidValueFor { name: String, value: String },
 }
 
 impl Error {
+    #[inline]
     pub fn child_missing<T: ?Sized>() -> Self {
-        Self::ChildElementIsMissing(core::any::type_name::<T>().to_string())
+        Self::ChildElementIsMissing(
+            core::any::type_name::<T>().to_string(),
+            Box::new(Backtrace::new()),
+        )
     }
 
     pub fn invalid_value_for<T: ?Sized, V: Into<String>>(value: V) -> Self {
@@ -52,35 +62,37 @@ impl Error {
             backtrace: Box::new(Backtrace::new()),
         }
     }
-}
 
-impl From<(&str, Infallible)> for Error {
-    fn from(_: (&str, Infallible)) -> Self {
-        unreachable!()
+    #[inline]
+    pub fn parser_failed(
+        field: impl Into<String>,
+        ty: impl Into<String>,
+        error: impl Into<ParseError>,
+    ) -> Self {
+        Self::ParseError {
+            path: String::new(),
+            field: field.into(),
+            ty: ty.into(),
+            error: error.into(),
+            bt: Box::new(Backtrace::new()),
+        }
     }
 }
 
-impl From<(&str, Error)> for Error {
-    fn from((_, error): (&str, Error)) -> Self {
+impl From<(&str, &str, Error)> for Error {
+    #[inline]
+    fn from((_field, _ty, error): (&str, &str, Error)) -> Self {
         error
     }
 }
 
-impl From<(&str, ParseIntError)> for Error {
-    fn from((name, error): (&str, ParseIntError)) -> Self {
-        Self::ParseError(name.to_string(), ParseError::from(error))
-    }
-}
-
-impl From<(&str, ParseFloatError)> for Error {
-    fn from((name, error): (&str, ParseFloatError)) -> Self {
-        Self::ParseError(name.to_string(), ParseError::from(error))
-    }
-}
-
-impl From<(&str, ParseBoolError)> for Error {
-    fn from((name, error): (&str, ParseBoolError)) -> Self {
-        Self::ParseError(name.to_string(), ParseError::from(error))
+impl<T> From<(&str, &str, T)> for Error
+where
+    T: Into<ParseError>,
+{
+    #[inline]
+    fn from((field, ty, error): (&str, &str, T)) -> Self {
+        Self::parser_failed(field, ty, error)
     }
 }
 
@@ -89,6 +101,12 @@ pub enum ParseError {
     Int(ParseIntError),
     Float(ParseFloatError),
     Bool(ParseBoolError),
+}
+
+impl From<Infallible> for ParseError {
+    fn from(_: Infallible) -> Self {
+        unreachable!()
+    }
 }
 
 pub trait ToScientificString {
@@ -111,7 +129,7 @@ macro_rules! find_map_parse_attr {
             .map(|a| {
                 a.value
                     .parse::<$ty>()
-                    .map_err(|e| $crate::parser::Error::from((stringify!($ty), e)))
+                    .map_err(|e| $crate::parser::Error::from(($name, stringify!($ty), e)))
             })
             .transpose()
     };

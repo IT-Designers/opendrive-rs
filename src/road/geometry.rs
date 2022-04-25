@@ -4,15 +4,15 @@ use uom::si::angle::radian;
 use uom::si::curvature::radian_per_meter;
 use uom::si::f64::{Angle, Curvature, Length};
 use uom::si::length::meter;
+use vec1::Vec1;
 use xml::attribute::OwnedAttribute;
 use xml::reader::XmlEvent;
 
 /// Contains geometry elements that define the layout of the road reference line in the x/y-plane
 /// (plan view).
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct PlanView {
-    pub geometry: Vec<Geometry>,
+    pub geometry: Vec1<Geometry>,
     // TODO pub additional_data: HashMap<String, String>,
 }
 
@@ -30,14 +30,16 @@ impl PlanView {
 
         find_map_parse_elem!(
             events,
-            // TODO require at least one
-            "geometry" => |attributes| {
+            "geometry" true => |attributes| {
                 geometry.push(Geometry::from_events(events, attributes)?);
                 Ok(())
             }
         );
 
-        Ok(Self { geometry })
+        Ok(Self {
+            geometry: Vec1::try_from_vec(geometry)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
+        })
     }
 
     pub fn visit_attributes(
@@ -57,6 +59,19 @@ impl PlanView {
             visit_children!(visitor, "geometry" => geometry);
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for PlanView {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            geometry: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+        })
     }
 }
 

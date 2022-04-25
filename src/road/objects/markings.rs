@@ -1,14 +1,14 @@
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
+use vec1::Vec1;
 use xml::attribute::OwnedAttribute;
 use xml::reader::XmlEvent;
 
 /// Describes the appearance of the parking space with multiple marking elements.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Markings {
-    pub marking: Vec<Marking>,
+    pub marking: Vec1<Marking>,
 }
 
 impl Markings {
@@ -26,7 +26,10 @@ impl Markings {
             },
         );
 
-        Ok(Self { marking })
+        Ok(Self {
+            marking: Vec1::try_from_vec(marking)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
+        })
     }
 
     pub fn visit_attributes(
@@ -46,6 +49,19 @@ impl Markings {
             visit_children!(visitor, "marking" => marking);
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Markings {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            marking: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+        })
     }
 }
 

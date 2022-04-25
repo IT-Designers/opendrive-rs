@@ -45,7 +45,7 @@ impl Tunnel {
         Ok(Self {
             daylight: find_map_parse_attr!(attributes, "daylight", Option<f64>)?,
             id: find_map_parse_attr!(attributes, "id", String)?,
-            length: find_map_parse_attr!(attributes, "id", f64).map(Length::new::<meter>)?,
+            length: find_map_parse_attr!(attributes, "length", f64).map(Length::new::<meter>)?,
             lighting: find_map_parse_attr!(attributes, "lighting", Option<f64>)?,
             name: find_map_parse_attr!(attributes, "name", Option<String>)?,
             s: find_map_parse_attr!(attributes, "s", f64).map(Length::new::<meter>)?,

@@ -2,6 +2,7 @@ use crate::road::lane::LaneType;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
+use vec1::Vec1;
 use xml::attribute::OwnedAttribute;
 use xml::reader::XmlEvent;
 
@@ -9,9 +10,8 @@ use xml::reader::XmlEvent;
 /// road reference line. The inner area of the described outline may be filled with a filling type,
 /// such as grass, concrete, asphalt, or pavement.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Outlines {
-    pub outline: Vec<Outline>,
+    pub outline: Vec1<Outline>,
 }
 
 impl Outlines {
@@ -29,7 +29,10 @@ impl Outlines {
             },
         );
 
-        Ok(Self { outline })
+        Ok(Self {
+            outline: Vec1::try_from_vec(outline)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
+        })
     }
 
     pub fn visit_attributes(
@@ -52,6 +55,19 @@ impl Outlines {
     }
 }
 
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Outlines {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            outline: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+        })
+    }
+}
+
 /// Defines a series of corner points, including the height of the object relative to the road
 /// reference line. For areas, the points should be listed in counter-clockwise order.
 /// An `<outline>` element shall be followed by one or more `<cornerRoad>` element or by one or more
@@ -59,7 +75,6 @@ impl Outlines {
 /// ASAM OpenDRIVE 1.4 outline definitions (without `<outlines>` parent element) shall still be
 /// supported.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Outline {
     /// If true, the outline describes an area, not a linear feature
     pub closed: Option<bool>,
@@ -71,7 +86,7 @@ pub struct Outline {
     pub lane_type: Option<LaneType>,
     /// Defines if outline is an outer outline of the object
     pub outer: Option<bool>,
-    pub choice: Vec<Corner>,
+    pub choice: Vec1<Corner>,
 }
 
 impl Outline {
@@ -93,17 +108,14 @@ impl Outline {
             },
         );
 
-        if choice.is_empty() {
-            return Err(crate::parser::Error::child_missing::<Self>());
-        }
-
         Ok(Self {
             closed: find_map_parse_attr!(attributes, "closed", Option<bool>)?,
             fill_type: find_map_parse_attr!(attributes, "fillType", Option<OutlineFillType>)?,
             id: find_map_parse_attr!(attributes, "id", Option<u64>)?,
             lane_type: find_map_parse_attr!(attributes, "laneType", Option<LaneType>)?,
             outer: find_map_parse_attr!(attributes, "outer", Option<bool>)?,
-            choice,
+            choice: Vec1::try_from_vec(choice)
+                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
         })
     }
 
@@ -134,6 +146,24 @@ impl Outline {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Outline {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            closed: u.arbitrary()?,
+            fill_type: u.arbitrary()?,
+            id: u.arbitrary()?,
+            lane_type: u.arbitrary()?,
+            outer: u.arbitrary()?,
+            choice: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+        })
     }
 }
 
