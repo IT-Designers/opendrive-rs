@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// Used to add rules that are not covered by any of the other lane attributes that are described in
 /// this specification.
@@ -19,18 +17,6 @@ pub struct Rule {
 }
 
 impl Rule {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
-            value: find_map_parse_attr!(attributes, "value", String)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -50,6 +36,20 @@ impl Rule {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Rule
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            s_offset: read.attribute("sOffset").map(Length::new::<meter>)?,
+            value: read.attribute("value")?,
+        })
     }
 }
 

@@ -1,6 +1,4 @@
 use std::borrow::Cow;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
@@ -12,18 +10,6 @@ pub struct LaneValidity {
 }
 
 impl LaneValidity {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            from_lane: find_map_parse_attr!(attributes, "fromLane", i64)?,
-            to_lane: find_map_parse_attr!(attributes, "toLane", i64)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -43,5 +29,19 @@ impl LaneValidity {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for LaneValidity
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            from_lane: read.attribute("fromLane")?,
+            to_lane: read.attribute("toLane")?,
+        })
     }
 }

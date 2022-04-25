@@ -1,25 +1,208 @@
 use backtrace::Backtrace;
 use std::convert::Infallible;
+use std::fmt::{Display, Formatter};
 use std::num::{ParseFloatError, ParseIntError};
-use std::str::ParseBoolError;
+use std::str::{FromStr, ParseBoolError};
+use xml::attribute::OwnedAttribute;
+
+#[derive(Debug, Copy, Clone)]
+pub struct Path<'a> {
+    pub parent: Option<&'a Path<'a>>,
+    pub name: &'a str,
+}
+
+impl Display for Path<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if let Some(parent) = self.parent {
+            write!(f, "{}.{}", parent, self.name)
+        } else {
+            write!(f, "{}", self.name)
+        }
+    }
+}
+
+pub struct ReadContext<'a, I>
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    pub iterator: &'a mut I,
+    pub path: Path<'a>,
+    pub attributes: Vec<OwnedAttribute>,
+    pub children_done: bool,
+}
+
+impl<'a, I> ReadContext<'a, I>
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    pub fn path(&self) -> Path {
+        self.path
+    }
+
+    pub fn element_name(&self) -> &str {
+        self.path.name
+    }
+
+    pub fn attribute<T: FromStr>(&self, name: &str) -> Result<T, Error>
+    where
+        T::Err: Into<ParseError>,
+    {
+        for attribute in &self.attributes {
+            if attribute.name.local_name.eq_ignore_ascii_case(name) {
+                return match T::from_str(&attribute.value) {
+                    Ok(v) => Ok(v),
+                    Err(e) => Err(Error::ParseError {
+                        path: self.path.to_string(),
+                        field: name.to_string(),
+                        ty: core::any::type_name::<T>().to_string(),
+                        error: e.into(),
+                        bt: Box::new(Backtrace::new()),
+                    }),
+                };
+            }
+        }
+        Err(Error::missing_attribute(
+            self.path.to_string(),
+            name,
+            core::any::type_name::<T>(),
+        ))
+    }
+
+    pub fn attribute_opt<T: FromStr>(&self, name: &str) -> Result<Option<T>, Error>
+    where
+        T::Err: Into<ParseError>,
+    {
+        for attribute in &self.attributes {
+            if attribute.name.local_name.eq_ignore_ascii_case(name) {
+                return match T::from_str(&attribute.value) {
+                    Ok(v) => Ok(Some(v)),
+                    Err(e) => Err(Error::ParseError {
+                        path: self.path.to_string(),
+                        field: name.to_string(),
+                        ty: core::any::type_name::<T>().to_string(),
+                        error: e.into(),
+                        bt: Box::new(Backtrace::new()),
+                    }),
+                };
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn elements(
+        &mut self,
+        mapper: &mut [(
+            &str,
+            &mut dyn for<'b> FnMut(&'b mut ReadContext<'_, I>) -> Result<(), Error>,
+        )],
+    ) -> Result<(), Error> {
+        'outer: while let Some(event) = self.iterator.next() {
+            match event? {
+                xml::reader::XmlEvent::StartElement {
+                    name,
+                    attributes,
+                    namespace: _,
+                } => {
+                    let mut context = ReadContext {
+                        iterator: &mut *self.iterator,
+                        path: Path {
+                            parent: Some(&self.path),
+                            name: &name.local_name,
+                        },
+                        attributes,
+                        children_done: false,
+                    };
+                    for (mapper_name, mapper_fn) in mapper.iter_mut() {
+                        if name.local_name.eq_ignore_ascii_case(mapper_name) {
+                            mapper_fn(&mut context)?;
+                            continue 'outer;
+                        }
+                    }
+                    context.elements(&mut [])?;
+                }
+                #[cfg_attr(debug_assertions, allow(unused))]
+                xml::reader::XmlEvent::EndElement { name } => {
+                    debug_assert_eq!(self.element_name(), &name.local_name);
+                    self.children_done = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    pub fn children(
+        &mut self,
+        mut mapper: impl for<'b> FnMut(&'b str, ReadContext<'_, I>) -> Result<(), Error>,
+    ) -> Result<(), Error> {
+        while let Some(event) = self.iterator.next() {
+            match event? {
+                xml::reader::XmlEvent::StartElement {
+                    name,
+                    attributes,
+                    namespace: _,
+                } => {
+                    if let Err(e) = mapper(
+                        &name.local_name,
+                        ReadContext {
+                            iterator: &mut *self.iterator,
+                            path: Path {
+                                parent: Some(&self.path),
+                                name: &name.local_name,
+                            },
+                            attributes,
+                            children_done: false,
+                        },
+                    ) {
+                        // dont walk any more elements on an error, just drop them
+                        self.children_done = true;
+                        return Err(e);
+                    }
+                }
+                #[cfg_attr(debug_assertions, allow(unused))]
+                xml::reader::XmlEvent::EndElement { name } => {
+                    debug_assert_eq!(self.element_name(), &name.local_name);
+                    self.children_done = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'a, I> Drop for ReadContext<'a, I>
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    fn drop(&mut self) {
+        if !self.children_done {
+            let _ = self.children(|name, ctx| {
+                dbg!(name);
+                // walk it by dropping it
+                let _ = (name, ctx);
+                Ok(())
+            });
+        }
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("XML parsing failed: {0}")]
     XmlError(#[from] xml::reader::Error),
-    #[error("The required attribute `{name} is missing")]
-    AttributeMissing {
-        name: String,
-        backtrace: Box<Backtrace>,
-    },
-    #[error("The required element `{name} is missing")]
+    #[error("Missing element at `{path}`.`{field}` of type `{ty}`")]
     ElementMissing {
-        name: String,
+        path: String,
+        field: String,
+        ty: String,
         backtrace: Box<Backtrace>,
     },
     #[error("A child element in `{0} is missing")]
     ChildElementIsMissing(String, Box<Backtrace>),
-    #[error("Failed to parse value of field `{field}` to `{ty}`: {error}")]
+    #[error("Failed to parse `{path}`.`{field}` as `{ty}`: {error}")]
     ParseError {
         path: String,
         field: String,
@@ -27,11 +210,30 @@ pub enum Error {
         error: ParseError,
         bt: Box<Backtrace>,
     },
+    #[error("Missing attribute at `{path}`.`{field}` of type `{ty}`")]
+    MissingAttribute {
+        path: String,
+        field: String,
+        ty: String,
+    },
     #[error("Invalid value for `{name}`: {value}")]
     InvalidValueFor { name: String, value: String },
 }
 
 impl Error {
+    #[inline]
+    pub fn missing_attribute(
+        path: impl Into<String>,
+        field: impl Into<String>,
+        ty: impl Into<String>,
+    ) -> Self {
+        Self::MissingAttribute {
+            path: path.into(),
+            field: field.into(),
+            ty: ty.into(),
+        }
+    }
+
     #[inline]
     pub fn child_missing<T: ?Sized>() -> Self {
         Self::ChildElementIsMissing(
@@ -48,17 +250,15 @@ impl Error {
     }
 
     #[inline]
-    pub fn missing_attribute(attribute_name: impl Into<String>) -> Self {
-        Self::AttributeMissing {
-            name: attribute_name.into(),
-            backtrace: Box::new(Backtrace::new()),
-        }
-    }
-
-    #[inline]
-    pub fn missing_element(element_name: impl Into<String>) -> Self {
+    pub fn missing_element(
+        path: impl Into<String>,
+        field: impl Into<String>,
+        ty: impl Into<String>,
+    ) -> Self {
         Self::ElementMissing {
-            name: element_name.into(),
+            path: path.into(),
+            field: field.into(),
+            ty: ty.into(),
             backtrace: Box::new(Backtrace::new()),
         }
     }
@@ -101,6 +301,7 @@ pub enum ParseError {
     Int(ParseIntError),
     Float(ParseFloatError),
     Bool(ParseBoolError),
+    InvalidEnumValue(InvalidEnumValue),
 }
 
 impl From<Infallible> for ParseError {
@@ -120,6 +321,22 @@ impl ToScientificString for f64 {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub struct InvalidEnumValue {
+    pub r#type: String,
+    pub value: String,
+}
+
+impl Display for InvalidEnumValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Invalid value for enum variant {}: {}",
+            self.r#type, self.value
+        )
+    }
+}
+
 #[macro_export]
 macro_rules! find_map_parse_attr {
     ($attrs:ident, $name:literal, Option<$ty:ty>) => {
@@ -135,7 +352,9 @@ macro_rules! find_map_parse_attr {
     };
     ($attrs:ident, $name:literal, $ty:ty) => {
         find_map_parse_attr!($attrs, $name, Option<$ty>).and_then(|v| {
-            v.ok_or_else(|| $crate::parser::Error::missing_attribute($name.to_string()))
+            v.ok_or_else(|| {
+                $crate::parser::Error::missing_attribute("<unknown>", $name, stringify!($ty))
+            })
         })
     };
 }
@@ -205,7 +424,59 @@ macro_rules! find_map_parse_elem {
             if __fields[__index] {
                 $(
                     let _: bool = $req;
-                    return Err($crate::parser::Error::missing_element($name.to_string()))
+                    return Err($crate::parser::Error::missing_element(
+                        "<unknown>",
+                        $name,
+                        stringify!($body)
+                    ));
+                )?
+            }
+            __index += 1;
+        )*
+    }
+}
+
+#[macro_export]
+macro_rules! match_child_eq_ignore_ascii_case {
+    ($context:ident, $($name:literal $($req:literal)? => $ty:ty => $consumer:expr,)* $(_ => $alt:expr)? $(,)?) => {
+        let mut __fields = [
+            true,
+            $(
+                {
+                    #[allow(unused_mut, unused_assignments)]
+                    let mut r = false;
+                    $(r = $req;)?
+                    r
+                },
+            )*
+        ];
+
+        $context.children(|name, context| {
+            let mut __index = 1;
+            $(
+                if $name.eq_ignore_ascii_case(name) {
+                    let v = <$ty as TryFrom<_>>::try_from(context)?;
+                    let _ = $consumer(v);
+                    __fields[__index] = false;
+                    return Ok(());
+                }
+                __index += 1;
+            )*
+            Ok(())
+        })?;
+
+
+        let mut __index = 1;
+        $(
+            let _ = $name;
+            if __fields[__index] {
+                $(
+                    let _: bool = $req;
+                    return Err($crate::parser::Error::missing_element(
+                        $context.path().to_string(),
+                        $name,
+                        stringify!($ty),
+                    ));
                 )?
             }
             __index += 1;
@@ -283,13 +554,16 @@ macro_rules! impl_from_str_as_str {
         }
 
         impl core::str::FromStr for $ty {
-            type Err = $crate::parser::Error;
+            type Err = $crate::parser::InvalidEnumValue;
 
             #[allow(deprecated)]
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
                     $(_ if s.eq_ignore_ascii_case(Self::$value.as_str()) => Ok(Self::$value),)*
-                    _ => Err($crate::parser::Error::invalid_value_for::<Self, _>(s)),
+                    _ => Err($crate::parser::InvalidEnumValue {
+                        r#type: stringify!(Self).to_string(),
+                        value: s.to_string(),
+                    }),
                 }
             }
         }

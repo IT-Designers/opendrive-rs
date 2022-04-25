@@ -1,6 +1,4 @@
 use std::borrow::Cow;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// Details for a parking space may be added to the `<object>` element.
 #[derive(Debug, Clone, PartialEq)]
@@ -14,18 +12,6 @@ pub struct ParkingSpace {
 }
 
 impl ParkingSpace {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            access: find_map_parse_attr!(attributes, "access", Access)?,
-            restrictions: find_map_parse_attr!(attributes, "restrictions", Option<String>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -45,6 +31,19 @@ impl ParkingSpace {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for ParkingSpace
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            access: read.attribute("access")?,
+            restrictions: read.attribute_opt("restrictions")?,
+        })
     }
 }
 

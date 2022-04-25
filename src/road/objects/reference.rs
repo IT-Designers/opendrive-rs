@@ -3,8 +3,6 @@ use crate::road::objects::Orientation;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// It is possible to link an object with one or more roads, signals or other objects using a
 /// `<objectReference>` element. The referenced objects require a unique ID. The object reference
@@ -30,33 +28,6 @@ pub struct ObjectReference {
 }
 
 impl ObjectReference {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut validity = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "validity" => |attributes| {
-                validity.push(LaneValidity::from_events(events, attributes)?);
-                Ok(())
-            }
-        );
-
-        Ok(Self {
-            id: find_map_parse_attr!(attributes, "id", String)?,
-            orientation: find_map_parse_attr!(attributes, "orientation", Orientation)?,
-            s: find_map_parse_attr!(attributes, "s", f64).map(Length::new::<meter>)?,
-            t: find_map_parse_attr!(attributes, "t", f64).map(Length::new::<meter>)?,
-            valid_length: find_map_parse_attr!(attributes, "validLength", Option<f64>)?
-                .map(Length::new::<meter>),
-            z_offset: find_map_parse_attr!(attributes, "zOffset", Option<f64>)?
-                .map(Length::new::<meter>),
-            validity,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -82,6 +53,32 @@ impl ObjectReference {
             visit_children!(visitor, "validity" => validity);
         }
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for ObjectReference
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut validity = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "validity" => LaneValidity => |v| validity.push(v),
+        );
+
+        Ok(Self {
+            id: read.attribute("id")?,
+            orientation: read.attribute("orientation")?,
+            s: read.attribute("s").map(Length::new::<meter>)?,
+            t: read.attribute("t").map(Length::new::<meter>)?,
+            valid_length: read.attribute_opt("validLength")?.map(Length::new::<meter>),
+            z_offset: read.attribute_opt("zOffset")?.map(Length::new::<meter>),
+            validity,
+        })
     }
 }
 

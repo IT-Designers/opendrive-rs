@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// Stores information about the material of lanes. Each element is valid until a new element is
 /// defined. If multiple elements are defined, they must be listed in ascending order.
@@ -20,20 +18,6 @@ pub struct Material {
 }
 
 impl Material {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            friction: find_map_parse_attr!(attributes, "friction", f64)?,
-            roughness: find_map_parse_attr!(attributes, "roughness", Option<f64>)?,
-            s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
-            surface: find_map_parse_attr!(attributes, "surface", Option<String>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -55,6 +39,22 @@ impl Material {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Material
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            friction: read.attribute("friction")?,
+            roughness: read.attribute_opt("roughness")?,
+            s_offset: read.attribute("sOffset").map(Length::new::<meter>)?,
+            surface: read.attribute_opt("surface")?,
+        })
     }
 }
 

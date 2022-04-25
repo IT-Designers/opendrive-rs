@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// Lane height shall be defined along the h-coordinate. Lane height may be used to elevate a lane
 /// independent from the road elevation. Lane height is used to implement small-scale elevation such
@@ -20,19 +18,6 @@ pub struct Height {
 }
 
 impl Height {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            inner: find_map_parse_attr!(attributes, "inner", f64).map(Length::new::<meter>)?,
-            outer: find_map_parse_attr!(attributes, "outer", f64).map(Length::new::<meter>)?,
-            s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -53,6 +38,21 @@ impl Height {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Height
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            inner: read.attribute("inner").map(Length::new::<meter>)?,
+            outer: read.attribute("outer").map(Length::new::<meter>)?,
+            s_offset: read.attribute("sOffset").map(Length::new::<meter>)?,
+        })
     }
 }
 

@@ -5,8 +5,6 @@ use std::str::FromStr;
 use uom::si::angle::radian;
 use uom::si::f64::{Angle, Length};
 use uom::si::length::meter;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 use xml::{EventReader, EventWriter};
 
 pub mod additional_data;
@@ -25,40 +23,22 @@ impl OpenDrive {
         let mut events = reader.into_iter();
         let mut drive = None;
 
-        find_map_parse_elem!(
-            events,
-            "OpenDRIVE" true => |attributes| {
-                drive = Some(Self::from_events(&mut events, attributes)?);
-                Ok(())
-            }
+        let mut read = crate::parser::ReadContext {
+            iterator: &mut events,
+            path: crate::parser::Path {
+                parent: None,
+                name: "",
+            },
+            attributes: Vec::new(),
+            children_done: false,
+        };
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "OpenDRIVE" true => OpenDrive => |v| drive = Some(v),
         );
 
-        Ok(drive.expect("Required element"))
-    }
-
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut header = None;
-        let mut roads = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "header" => |attributes| {
-                header = Some(Header::from_events(events, attributes)?);
-                Ok(())
-            },
-            "road" => |attributes| {
-                roads.push(Road::from_events(events, attributes)?);
-                Ok(())
-            },
-        );
-
-        Ok(Self {
-            header: header.unwrap(),
-            roads,
-        })
+        Ok(drive.unwrap())
     }
 
     pub fn to_writer(&self) -> xml::writer::Result<EventWriter<Vec<u8>>> {
@@ -109,6 +89,29 @@ impl OpenDrive {
     }
 }
 
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for OpenDrive
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut header = None;
+        let mut roads = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "header" true => Header => |v| header = Some(v),
+            "road" => Road => |v| roads.push(v),
+        );
+
+        Ok(Self {
+            header: header.unwrap(),
+            roads,
+        })
+    }
+}
+
 /// The `<header>` element is the very first element within the `<OpenDRIVE>` element.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Header {
@@ -127,43 +130,6 @@ pub struct Header {
 }
 
 impl Header {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut geo_reference = None;
-        let mut offset = None;
-
-        find_map_parse_elem!(
-            events,
-            "geoReference" => |attributes| {
-                geo_reference = Some(GeoReference::from_events(events, attributes)?);
-                Ok(())
-            },
-            "offset" => |attributes| {
-                offset = Some(Offset::from_events(events, attributes)?);
-                Ok(())
-            },
-        );
-
-        Ok(Self {
-            rev_major: find_map_parse_attr!(attributes, "revMajor", u16)?,
-            rev_minor: find_map_parse_attr!(attributes, "revMinor", u16)?,
-            name: find_map_parse_attr!(attributes, "name", Option<String>)?,
-            version: find_map_parse_attr!(attributes, "version", Option<String>)?,
-            date: find_map_parse_attr!(attributes, "date", Option<String>)?,
-            north: find_map_parse_attr!(attributes, "north", Option<f64>)?
-                .map(Length::new::<meter>),
-            south: find_map_parse_attr!(attributes, "south", Option<f64>)?
-                .map(Length::new::<meter>),
-            east: find_map_parse_attr!(attributes, "east", Option<f64>)?.map(Length::new::<meter>),
-            west: find_map_parse_attr!(attributes, "west", Option<f64>)?.map(Length::new::<meter>),
-            vendor: find_map_parse_attr!(attributes, "vendor", Option<String>)?,
-            geo_reference,
-            offset,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -196,6 +162,39 @@ impl Header {
             visit_children!(visitor, "offset" => offset);
         }
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Header
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut geo_reference = None;
+        let mut offset = None;
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "geoReference" => GeoReference => |v| geo_reference = Some(v),
+            "offset" => Offset => |v| offset = Some(v),
+        );
+
+        Ok(Self {
+            rev_major: read.attribute("revMajor")?,
+            rev_minor: read.attribute("revMinor")?,
+            name: read.attribute_opt("name")?,
+            version: read.attribute_opt("version")?,
+            date: read.attribute_opt("date")?,
+            north: read.attribute_opt("north")?.map(Length::new::<meter>),
+            south: read.attribute_opt("south")?.map(Length::new::<meter>),
+            east: read.attribute_opt("east")?.map(Length::new::<meter>),
+            west: read.attribute_opt("west")?.map(Length::new::<meter>),
+            vendor: read.attribute_opt("vendor")?,
+            geo_reference,
+            offset,
+        })
     }
 }
 
@@ -298,15 +297,6 @@ pub struct GeoReference {
 }
 
 impl GeoReference {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let _ = attributes;
-        find_map_parse_elem!(events);
-        Ok(Self {})
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -322,6 +312,17 @@ impl GeoReference {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for GeoReference
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(_read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {})
     }
 }
 
@@ -343,19 +344,6 @@ pub struct Offset {
 }
 
 impl Offset {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-        Ok(Self {
-            hdg: find_map_parse_attr!(attributes, "hdg", f64).map(Angle::new::<radian>)?,
-            x: find_map_parse_attr!(attributes, "x", f64).map(Length::new::<meter>)?,
-            y: find_map_parse_attr!(attributes, "y", f64).map(Length::new::<meter>)?,
-            z: find_map_parse_attr!(attributes, "z", f64).map(Length::new::<meter>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -377,6 +365,22 @@ impl Offset {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Offset
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            hdg: read.attribute("hdg").map(Angle::new::<radian>)?,
+            x: read.attribute("x").map(Length::new::<meter>)?,
+            y: read.attribute("y").map(Length::new::<meter>)?,
+            z: read.attribute("z").map(Length::new::<meter>)?,
+        })
     }
 }
 

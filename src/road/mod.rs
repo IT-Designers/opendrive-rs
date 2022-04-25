@@ -6,8 +6,6 @@ use crate::road::profile::{ElevationProfile, LateralProfile};
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 pub mod geometry;
 pub mod lane;
@@ -51,60 +49,6 @@ pub struct Road {
     // pub raildroad: (),
 }
 impl Road {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut link = None;
-        let mut plan_view = None;
-        let mut elevation_profile = None;
-        let mut lateral_profile = None;
-        let mut lanes = None;
-        let mut objects = None;
-
-        find_map_parse_elem!(
-            events,
-            "link" => |attributes| {
-                link = Some(Link::from_events(events, attributes)?);
-                Ok(())
-            },
-            "planView" true => |attributes| {
-                plan_view = Some(PlanView::from_events(events, attributes)?);
-                Ok(())
-            },
-            "elevationProfile" => |attributes| {
-                elevation_profile = Some(ElevationProfile::from_events(events, attributes)?);
-                Ok(())
-            },
-            "lateralProfile" => |attributes| {
-                lateral_profile = Some(LateralProfile::from_events(events, attributes)?);
-                Ok(())
-            },
-            "lanes" true => |attributes| {
-                lanes = Some(Lanes::from_events(events, attributes)?);
-                Ok(())
-            },
-            "objects" => |attributes| {
-                objects = Some(Objects::from_events(events, attributes)?);
-                Ok(())
-            }
-        );
-
-        Ok(Self {
-            id: find_map_parse_attr!(attributes, "id", String)?,
-            junction: find_map_parse_attr!(attributes, "junction", String)?,
-            length: find_map_parse_attr!(attributes, "length", f64).map(Length::new::<meter>)?,
-            name: find_map_parse_attr!(attributes, "name", Option<String>)?,
-            rule: find_map_parse_attr!(attributes, "rule", Option<Rule>)?,
-            link,
-            plan_view: plan_view.unwrap(),
-            elevation_profile,
-            lateral_profile,
-            lanes: lanes.unwrap(),
-            objects,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -151,6 +95,46 @@ impl Road {
     }
 }
 
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Road
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut link = None;
+        let mut plan_view = None;
+        let mut elevation_profile = None;
+        let mut lateral_profile = None;
+        let mut lanes = None;
+        let mut objects = None;
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "link" => Link => |v| link = Some(v),
+            "planView" true => PlanView => |v| plan_view = Some(v),
+            "elevationProfile" => ElevationProfile => |v| elevation_profile = Some(v),
+            "lateralProfile" => LateralProfile => |v| lateral_profile = Some(v),
+            "lanes" true => Lanes => |v| lanes = Some(v),
+            "objects" => Objects => |v| objects = Some(v),
+        );
+
+        Ok(Self {
+            id: read.attribute("id")?,
+            junction: read.attribute("junction")?,
+            length: read.attribute("length").map(Length::new::<meter>)?,
+            name: read.attribute_opt("name")?,
+            rule: read.attribute_opt("rule")?,
+            link,
+            plan_view: plan_view.unwrap(),
+            elevation_profile,
+            lateral_profile,
+            lanes: lanes.unwrap(),
+            objects,
+        })
+    }
+}
+
 #[cfg(feature = "fuzzing")]
 impl arbitrary::Arbitrary<'_> for Road {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
@@ -173,7 +157,7 @@ impl arbitrary::Arbitrary<'_> for Road {
 
 /// Follows the road header if the road is linked to a successor or a predecessor. Isolated roads
 /// may omit this element.
-#[derive(Default, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Link {
     pub predecessor: Option<PredecessorSuccessor>,
@@ -181,27 +165,6 @@ pub struct Link {
     // TODO pub additional_data: Vec<AdditionalData>,
 }
 impl Link {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut this = Self::default();
-
-        find_map_parse_elem!(
-            events,
-            "predecessor" => |attributes| {
-                this.predecessor = Some(PredecessorSuccessor::from_events(events, attributes)?);
-                Ok(())
-            },
-            "successor" => |attributes| {
-                this.successor = Some(PredecessorSuccessor::from_events(events, attributes)?);
-                Ok(())
-            }
-        );
-
-        Ok(this)
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -227,6 +190,29 @@ impl Link {
     }
 }
 
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Link
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut predecessor = None;
+        let mut successor = None;
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "predecessor" => PredecessorSuccessor => |v| predecessor = Some(v),
+            "successor" => PredecessorSuccessor => |v| successor = Some(v),
+        );
+
+        Ok(Self {
+            predecessor,
+            successor,
+        })
+    }
+}
+
 /// Successors and predecessors can be junctions or roads. For each, different attribute sets shall
 /// be used.
 #[derive(Debug, Clone, PartialEq)]
@@ -247,21 +233,6 @@ pub struct PredecessorSuccessor {
 }
 
 impl PredecessorSuccessor {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-        Ok(Self {
-            contact_point: find_map_parse_attr!(attributes, "contactPoint", Option<ContactPoint>)?,
-            element_dir: find_map_parse_attr!(attributes, "elementDir", Option<ElementDir>)?,
-            element_id: find_map_parse_attr!(attributes, "elementId", String)?,
-            element_s: find_map_parse_attr!(attributes, "elementS", Option<f64>)?
-                .map(Length::new::<meter>),
-            element_type: find_map_parse_attr!(attributes, "elementType", Option<ElementType>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -284,6 +255,23 @@ impl PredecessorSuccessor {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for PredecessorSuccessor
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            contact_point: read.attribute_opt("contactPoint")?,
+            element_dir: read.attribute_opt("elementDir")?,
+            element_id: read.attribute("elementId")?,
+            element_s: read.attribute_opt("elementS")?.map(Length::new::<meter>),
+            element_type: read.attribute_opt("elementType")?,
+        })
     }
 }
 

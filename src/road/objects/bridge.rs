@@ -2,8 +2,6 @@ use crate::road::objects::validity::LaneValidity;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bridge {
@@ -21,30 +19,6 @@ pub struct Bridge {
 }
 
 impl Bridge {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut validity = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "validity" => |attributes| {
-                validity.push(LaneValidity::from_events(events, attributes)?);
-                Ok(())
-            }
-        );
-
-        Ok(Self {
-            id: find_map_parse_attr!(attributes, "id", String)?,
-            length: find_map_parse_attr!(attributes, "length", f64).map(Length::new::<meter>)?,
-            name: find_map_parse_attr!(attributes, "name", Option<String>)?,
-            s: find_map_parse_attr!(attributes, "s", f64).map(Length::new::<meter>)?,
-            r#type: find_map_parse_attr!(attributes, "type", BridgeType)?,
-            validity,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -69,6 +43,31 @@ impl Bridge {
             visit_children!(visitor, "validity" => validity);
         }
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Bridge
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut validity = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "validity" => LaneValidity => |v| validity.push(v),
+        );
+
+        Ok(Self {
+            id: read.attribute("id")?,
+            length: read.attribute("length").map(Length::new::<meter>)?,
+            name: read.attribute_opt("name")?,
+            s: read.attribute("s").map(Length::new::<meter>)?,
+            r#type: read.attribute("type")?,
+            validity,
+        })
     }
 }
 

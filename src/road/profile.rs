@@ -1,6 +1,4 @@
 use std::borrow::Cow;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// Defines the characteristics of the road elevation along the reference line.
 #[derive(Debug, Clone, PartialEq)]
@@ -10,23 +8,6 @@ pub struct ElevationProfile {
 }
 
 impl ElevationProfile {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut elevation = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "elevation" => |attributes| {
-                elevation.push(Elevation::from_events(events, attributes)?);
-                Ok(())
-            }
-        );
-
-        Ok(Self { elevation })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -44,6 +25,24 @@ impl ElevationProfile {
             visit_children!(visitor, "elevation" => elevation);
         }
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for ElevationProfile
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut elevation = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "elevation" => Elevation => |v| elevation.push(v),
+        );
+
+        Ok(Self { elevation })
     }
 }
 
@@ -65,20 +64,6 @@ pub struct Elevation {
 }
 
 impl Elevation {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-        Ok(Self {
-            a: find_map_parse_attr!(attributes, "a", f64)?,
-            b: find_map_parse_attr!(attributes, "b", f64)?,
-            c: find_map_parse_attr!(attributes, "c", f64)?,
-            d: find_map_parse_attr!(attributes, "d", f64)?,
-            s: find_map_parse_attr!(attributes, "s", f64)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -101,6 +86,23 @@ impl Elevation {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Elevation
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            a: read.attribute("a")?,
+            b: read.attribute("b")?,
+            c: read.attribute("c")?,
+            d: read.attribute("d")?,
+            s: read.attribute("s")?,
+        })
     }
 }
 
@@ -128,31 +130,6 @@ pub struct LateralProfile {
 }
 
 impl LateralProfile {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut super_elevation = Vec::new();
-        let mut shape = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "superelevation" => |attributes| {
-                super_elevation.push(SuperElevation::from_events(events, attributes)?);
-                Ok(())
-            },
-            "shape" => |attributes| {
-                shape.push(Shape::from_events(events, attributes)?);
-                Ok(())
-            }
-        );
-
-        Ok(Self {
-            super_elevation,
-            shape,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -178,6 +155,29 @@ impl LateralProfile {
     }
 }
 
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for LateralProfile
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut super_elevation = Vec::new();
+        let mut shape = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "superelevation" => SuperElevation => |v| super_elevation.push(v),
+            "shape" => Shape => |v| shape.push(v),
+        );
+
+        Ok(Self {
+            super_elevation,
+            shape,
+        })
+    }
+}
+
 /// Defined as the road section’s roll angle around the s-axis. Elements must be defined in
 /// ascending order along the reference line. The parameters of an element are valid until the next
 /// element starts or the road reference line ends. Per default, the superelevation of a road is
@@ -197,20 +197,6 @@ pub struct SuperElevation {
 }
 
 impl SuperElevation {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-        Ok(Self {
-            a: find_map_parse_attr!(attributes, "a", f64)?,
-            b: find_map_parse_attr!(attributes, "b", f64)?,
-            c: find_map_parse_attr!(attributes, "c", f64)?,
-            d: find_map_parse_attr!(attributes, "d", f64)?,
-            s: find_map_parse_attr!(attributes, "s", f64)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -233,6 +219,23 @@ impl SuperElevation {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for SuperElevation
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            a: read.attribute("a")?,
+            b: read.attribute("b")?,
+            c: read.attribute("c")?,
+            d: read.attribute("d")?,
+            s: read.attribute("s")?,
+        })
     }
 }
 
@@ -270,21 +273,6 @@ pub struct Shape {
 }
 
 impl Shape {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-        Ok(Self {
-            a: find_map_parse_attr!(attributes, "a", f64)?,
-            b: find_map_parse_attr!(attributes, "b", f64)?,
-            c: find_map_parse_attr!(attributes, "c", f64)?,
-            d: find_map_parse_attr!(attributes, "d", f64)?,
-            s: find_map_parse_attr!(attributes, "s", f64)?,
-            t: find_map_parse_attr!(attributes, "t", f64)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -308,6 +296,24 @@ impl Shape {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Shape
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            a: read.attribute("a")?,
+            b: read.attribute("b")?,
+            c: read.attribute("c")?,
+            d: read.attribute("d")?,
+            s: read.attribute("s")?,
+            t: read.attribute("t")?,
+        })
     }
 }
 

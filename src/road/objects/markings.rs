@@ -12,26 +12,6 @@ pub struct Markings {
 }
 
 impl Markings {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut marking = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "marking" true => |attributes| {
-                marking.push(Marking::from_events(events, attributes)?);
-                Ok(())
-            },
-        );
-
-        Ok(Self {
-            marking: Vec1::try_from_vec(marking)
-                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -49,6 +29,26 @@ impl Markings {
             visit_children!(visitor, "marking" => marking);
         }
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Markings
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut marking = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "marking" true => Marking => |v| marking.push(v),
+        );
+
+        Ok(Self {
+            marking: Vec1::try_from_vec(marking).unwrap(),
+        })
     }
 }
 
@@ -81,33 +81,6 @@ pub struct Marking {
 }
 
 impl Marking {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut corner_reference = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "cornerReference" => |attributes| {
-                corner_reference.push(CornerReference::from_events(events, attributes)?);
-                Ok(())
-            },
-        );
-
-        Ok(Self {
-            outline_id: find_map_parse_attr!(attributes, "outlineId", u64)?,
-            r#type: find_map_parse_attr!(attributes, "type", BorderType)?,
-            use_complete_outline: find_map_parse_attr!(
-                attributes,
-                "useCompleteOutline",
-                Option<bool>
-            )?,
-            width: find_map_parse_attr!(attributes, "width", f64).map(Length::new::<meter>)?,
-            corner_reference,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -134,6 +107,30 @@ impl Marking {
     }
 }
 
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Marking
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut corner_reference = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "cornerReference" => CornerReference => |v| corner_reference.push(v),
+        );
+
+        Ok(Self {
+            outline_id: read.attribute("outlineId")?,
+            r#type: read.attribute("type")?,
+            use_complete_outline: read.attribute_opt("useCompleteOutline")?,
+            width: read.attribute("width").map(Length::new::<meter>)?,
+            corner_reference,
+        })
+    }
+}
+
 #[cfg(feature = "fuzzing")]
 impl arbitrary::Arbitrary<'_> for Marking {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
@@ -154,6 +151,19 @@ impl arbitrary::Arbitrary<'_> for Marking {
 pub struct CornerReference {
     /// Identifier of the referenced outline point
     pub id: u64,
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for CornerReference
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: read.attribute("id")?,
+        })
+    }
 }
 
 impl CornerReference {

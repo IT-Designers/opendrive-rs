@@ -1,12 +1,9 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
 use uom::si::angle::radian;
 use uom::si::curvature::radian_per_meter;
 use uom::si::f64::{Angle, Curvature, Length};
 use uom::si::length::meter;
 use vec1::Vec1;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// Contains geometry elements that define the layout of the road reference line in the x/y-plane
 /// (plan view).
@@ -17,31 +14,6 @@ pub struct PlanView {
 }
 
 impl PlanView {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut geometry = Vec::new();
-        let mut additional_data = HashMap::new();
-
-        for attr in attributes {
-            additional_data.insert(attr.name.local_name, attr.value);
-        }
-
-        find_map_parse_elem!(
-            events,
-            "geometry" true => |attributes| {
-                geometry.push(Geometry::from_events(events, attributes)?);
-                Ok(())
-            }
-        );
-
-        Ok(Self {
-            geometry: Vec1::try_from_vec(geometry)
-                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -59,6 +31,26 @@ impl PlanView {
             visit_children!(visitor, "geometry" => geometry);
         }
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for PlanView
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut geometry = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "geometry" true => Geometry => |v| geometry.push(v),
+        );
+
+        Ok(Self {
+            geometry: Vec1::try_from_vec(geometry).unwrap(),
+        })
     }
 }
 
@@ -91,46 +83,6 @@ pub struct Geometry {
 }
 
 impl Geometry {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut choice = None;
-
-        find_map_parse_elem!(
-            events,
-            "line" => |attributes| {
-                choice = Some(GeometryType::Line(Line::from_events(events, attributes)?));
-                Ok(())
-            },
-            "spiral" => |attributes| {
-                choice = Some(GeometryType::Spiral(Spiral::from_events(events, attributes)?));
-                Ok(())
-            },
-            "arc" => |attributes| {
-                choice = Some(GeometryType::Arc(Arc::from_events(events, attributes)?));
-                Ok(())
-            },
-            "poly3" => |attributes| {
-                choice = Some(GeometryType::Poly3(Poly3::from_events(events, attributes)?));
-                Ok(())
-            },
-            "paramPoly3" => |attributes| {
-                choice = Some(GeometryType::ParamPoly3(ParamPoly3::from_events(events, attributes)?));
-                Ok(())
-            }
-        );
-
-        Ok(Self {
-            hdg: find_map_parse_attr!(attributes, "hdg", f64).map(Angle::new::<radian>)?,
-            length: find_map_parse_attr!(attributes, "length", f64).map(Length::new::<meter>)?,
-            s: find_map_parse_attr!(attributes, "s", f64).map(Length::new::<meter>)?,
-            x: find_map_parse_attr!(attributes, "x", f64).map(Length::new::<meter>)?,
-            y: find_map_parse_attr!(attributes, "y", f64).map(Length::new::<meter>)?,
-            choice: choice.ok_or_else(crate::parser::Error::child_missing::<Self>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -161,6 +113,41 @@ impl Geometry {
             }
         }
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Geometry
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut choice = None;
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "line" => Line => |v| choice = Some(GeometryType::Line(v)),
+            "spiral" => Spiral => |v| choice = Some(GeometryType::Spiral(v)),
+            "arc" => Arc => |v| choice = Some(GeometryType::Arc(v)),
+            "poly3" => Poly3 => |v| choice = Some(GeometryType::Poly3(v)),
+            "paramPoly3" => ParamPoly3 => |v| choice = Some(GeometryType::ParamPoly3(v)),
+        );
+
+        Ok(Self {
+            hdg: read.attribute("hdg").map(Angle::new::<radian>)?,
+            length: read.attribute("length").map(Length::new::<meter>)?,
+            s: read.attribute("s").map(Length::new::<meter>)?,
+            x: read.attribute("x").map(Length::new::<meter>)?,
+            y: read.attribute("y").map(Length::new::<meter>)?,
+            choice: choice.ok_or_else(|| {
+                crate::parser::Error::missing_element(
+                    read.path.to_string(),
+                    "line|spiral|arc|poly3|paramPoly3",
+                    core::any::type_name::<GeometryType>(),
+                )
+            })?,
+        })
     }
 }
 
@@ -199,14 +186,6 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-        Ok(Self {})
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -225,6 +204,17 @@ impl Line {
     }
 }
 
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Line
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(_read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {})
+    }
+}
+
 /// In ASAM OpenDRIVE, a spiral is represented by a `<spiral>` element within the `<geometry>`
 /// element.
 #[derive(Debug, Clone, PartialEq)]
@@ -238,19 +228,6 @@ pub struct Spiral {
 }
 
 impl Spiral {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-        Ok(Self {
-            curvature_start: find_map_parse_attr!(attributes, "curvStart", f64)
-                .map(Curvature::new::<radian_per_meter>)?,
-            curvature_end: find_map_parse_attr!(attributes, "curvEnd", f64)
-                .map(Curvature::new::<radian_per_meter>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -270,6 +247,23 @@ impl Spiral {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Spiral
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            curvature_start: read
+                .attribute("curvStart")
+                .map(Curvature::new::<radian_per_meter>)?,
+            curvature_end: read
+                .attribute("curvEnd")
+                .map(Curvature::new::<radian_per_meter>)?,
+        })
     }
 }
 
@@ -294,17 +288,6 @@ pub struct Arc {
 }
 
 impl Arc {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-        Ok(Self {
-            curvature: find_map_parse_attr!(attributes, "curvature", f64)
-                .map(Curvature::new::<radian_per_meter>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -323,6 +306,21 @@ impl Arc {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Arc
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            curvature: read
+                .attribute("curvature")
+                .map(Curvature::new::<radian_per_meter>)?,
+        })
     }
 }
 
@@ -355,19 +353,6 @@ pub struct Poly3 {
 }
 
 impl Poly3 {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-        Ok(Self {
-            a: find_map_parse_attr!(attributes, "a", f64)?,
-            b: find_map_parse_attr!(attributes, "b", f64)?,
-            c: find_map_parse_attr!(attributes, "c", f64)?,
-            d: find_map_parse_attr!(attributes, "d", f64)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -389,6 +374,22 @@ impl Poly3 {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Poly3
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            a: read.attribute("a")?,
+            b: read.attribute("b")?,
+            c: read.attribute("c")?,
+            d: read.attribute("d")?,
+        })
     }
 }
 
@@ -440,24 +441,6 @@ pub struct ParamPoly3 {
 }
 
 impl ParamPoly3 {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-        Ok(Self {
-            a_u: find_map_parse_attr!(attributes, "aU", f64)?,
-            a_v: find_map_parse_attr!(attributes, "aV", f64)?,
-            b_u: find_map_parse_attr!(attributes, "bU", f64)?,
-            b_v: find_map_parse_attr!(attributes, "bV", f64)?,
-            c_u: find_map_parse_attr!(attributes, "cU", f64)?,
-            c_v: find_map_parse_attr!(attributes, "cV", f64)?,
-            d_u: find_map_parse_attr!(attributes, "dU", f64)?,
-            d_v: find_map_parse_attr!(attributes, "dV", f64)?,
-            p_range: find_map_parse_attr!(attributes, "pRange", f64)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -484,6 +467,27 @@ impl ParamPoly3 {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for ParamPoly3
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            a_u: read.attribute("aU")?,
+            a_v: read.attribute("aV")?,
+            b_u: read.attribute("bU")?,
+            b_v: read.attribute("bV")?,
+            c_u: read.attribute("cU")?,
+            c_v: read.attribute("cV")?,
+            d_u: read.attribute("dU")?,
+            d_v: read.attribute("dV")?,
+            p_range: read.attribute("pRange")?,
+        })
     }
 }
 

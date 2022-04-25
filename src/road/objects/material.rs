@@ -1,6 +1,4 @@
 use std::borrow::Cow;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// Describes the material properties of objects, for example, patches that are part of the road
 /// surface but deviate from the standard road material. Supersedes the material specified in the
@@ -16,19 +14,6 @@ pub struct Material {
 }
 
 impl Material {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            friction: find_map_parse_attr!(attributes, "friction", Option<f64>)?,
-            roughness: find_map_parse_attr!(attributes, "roughness", Option<f64>)?,
-            surface: find_map_parse_attr!(attributes, "surface", Option<String>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -49,6 +34,21 @@ impl Material {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Material
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            friction: read.attribute_opt("friction")?,
+            roughness: read.attribute_opt("roughness")?,
+            surface: read.attribute_opt("surface")?,
+        })
     }
 }
 

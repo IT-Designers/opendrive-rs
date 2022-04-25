@@ -2,8 +2,6 @@ use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 use vec1::Vec1;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// Defines the style of the line at the outer border of a lane. The style of the center line that
 /// separates left and right lanes is determined by the road mark element for the center lane.
@@ -36,47 +34,6 @@ pub struct RoadMark {
 }
 
 impl RoadMark {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut sway = Vec::new();
-        let mut r#type = None;
-        let mut explicit = None;
-
-        find_map_parse_elem!(
-            events,
-            "sway" => |attributes| {
-                sway.push(Sway::from_events(events, attributes)?);
-                Ok(())
-            },
-            "type" => |attributes| {
-                r#type = Some(Type::from_events(events, attributes)?);
-                Ok(())
-            },
-            "explicit" => |attributes| {
-                explicit = Some(Explicit::from_events(events, attributes)?);
-                Ok(())
-            }
-        );
-
-        Ok(Self {
-            sway,
-            r#type,
-            explicit,
-            color: find_map_parse_attr!(attributes, "color", Color)?,
-            height: find_map_parse_attr!(attributes, "height", Option<f64>)?
-                .map(Length::new::<meter>),
-            lane_change: find_map_parse_attr!(attributes, "laneChange", Option<LaneChange>)?,
-            material: find_map_parse_attr!(attributes, "material", Option<String>)?,
-            s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
-            type_simplified: find_map_parse_attr!(attributes, "type", TypeSimplified)?,
-            weight: find_map_parse_attr!(attributes, "weight", Option<Weight>)?,
-            width: find_map_parse_attr!(attributes, "width", Option<f64>)?
-                .map(Length::new::<meter>),
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -113,6 +70,40 @@ impl RoadMark {
         }
 
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for RoadMark
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut sway = Vec::new();
+        let mut r#type = None;
+        let mut explicit = None;
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "sway" => Sway => |v| sway.push(v),
+            "type" => Type => |v| r#type = Some(v),
+            "explicit" => Explicit => |v| explicit = Some(v),
+        );
+
+        Ok(Self {
+            sway,
+            r#type,
+            explicit,
+            color: read.attribute("color")?,
+            height: read.attribute_opt("height")?.map(Length::new::<meter>),
+            lane_change: read.attribute_opt("laneChange")?,
+            material: read.attribute_opt("material")?,
+            s_offset: read.attribute("sOffset").map(Length::new::<meter>)?,
+            type_simplified: read.attribute("type")?,
+            weight: read.attribute_opt("weight")?,
+            width: read.attribute_opt("width")?.map(Length::new::<meter>),
+        })
     }
 }
 
@@ -163,21 +154,6 @@ pub struct Sway {
 }
 
 impl Sway {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            a: find_map_parse_attr!(attributes, "a", f64)?,
-            b: find_map_parse_attr!(attributes, "b", f64)?,
-            c: find_map_parse_attr!(attributes, "c", f64)?,
-            d: find_map_parse_attr!(attributes, "d", f64)?,
-            d_s: find_map_parse_attr!(attributes, "d_s", f64)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -200,6 +176,23 @@ impl Sway {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Sway
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            a: read.attribute("a")?,
+            b: read.attribute("b")?,
+            c: read.attribute("c")?,
+            d: read.attribute("d")?,
+            d_s: read.attribute("d_s")?,
+        })
     }
 }
 
@@ -231,28 +224,6 @@ pub struct Type {
 }
 
 impl Type {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut line = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "line" true => |attributes| {
-                line.push(TypeLine::from_events(events, attributes)?);
-                Ok(())
-            },
-        );
-
-        Ok(Self {
-            line: Vec1::try_from_vec(line)
-                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
-            name: find_map_parse_attr!(attributes, "name", String)?,
-            width: find_map_parse_attr!(attributes, "width", f64).map(Length::new::<meter>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -274,6 +245,28 @@ impl Type {
             visit_children!(visitor, "line" => line);
         }
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Type
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut line = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "line" true => TypeLine => |v| line.push(v),
+        );
+
+        Ok(Self {
+            line: Vec1::try_from_vec(line).unwrap(),
+            name: read.attribute("name")?,
+            width: read.attribute("width").map(Length::new::<meter>)?,
+        })
     }
 }
 
@@ -318,24 +311,6 @@ pub struct TypeLine {
 }
 
 impl TypeLine {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            color: find_map_parse_attr!(attributes, "color", Option<Color>)?,
-            length: find_map_parse_attr!(attributes, "length", f64).map(Length::new::<meter>)?,
-            rule: find_map_parse_attr!(attributes, "rule", Option<Rule>)?,
-            s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
-            space: find_map_parse_attr!(attributes, "space", f64).map(Length::new::<meter>)?,
-            t_offset: find_map_parse_attr!(attributes, "tOffset", f64).map(Length::new::<meter>)?,
-            width: find_map_parse_attr!(attributes, "width", Option<f64>)?
-                .map(Length::new::<meter>),
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -360,6 +335,25 @@ impl TypeLine {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for TypeLine
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            color: read.attribute_opt("color")?,
+            length: read.attribute("length").map(Length::new::<meter>)?,
+            rule: read.attribute_opt("rule")?,
+            s_offset: read.attribute("sOffset").map(Length::new::<meter>)?,
+            space: read.attribute("space").map(Length::new::<meter>)?,
+            t_offset: read.attribute("tOffset").map(Length::new::<meter>)?,
+            width: read.attribute_opt("width")?.map(Length::new::<meter>),
+        })
     }
 }
 
@@ -396,26 +390,6 @@ pub struct Explicit {
 }
 
 impl Explicit {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut line = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "line" true => |attributes| {
-                line.push(ExplicitLine::from_events(events, attributes)?);
-                Ok(())
-            },
-        );
-
-        Ok(Self {
-            line: Vec1::try_from_vec(line)
-                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -433,6 +407,25 @@ impl Explicit {
             visit_children!(visitor, "line" => line);
         }
         Ok(())
+    }
+}
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Explicit
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut line = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "line" true => ExplicitLine => |v| line.push(v),
+        );
+
+        Ok(Self {
+            line: Vec1::try_from_vec(line).unwrap(),
+        })
     }
 }
 
@@ -467,22 +460,6 @@ pub struct ExplicitLine {
 }
 
 impl ExplicitLine {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            length: find_map_parse_attr!(attributes, "length", f64).map(Length::new::<meter>)?,
-            rule: find_map_parse_attr!(attributes, "rule", Option<Rule>)?,
-            s_offset: find_map_parse_attr!(attributes, "sOffset", f64).map(Length::new::<meter>)?,
-            t_offset: find_map_parse_attr!(attributes, "tOffset", f64).map(Length::new::<meter>)?,
-            width: find_map_parse_attr!(attributes, "width", Option<f64>)?
-                .map(Length::new::<meter>),
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -505,6 +482,23 @@ impl ExplicitLine {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for ExplicitLine
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            length: read.attribute("length").map(Length::new::<meter>)?,
+            rule: read.attribute_opt("rule")?,
+            s_offset: read.attribute("sOffset").map(Length::new::<meter>)?,
+            t_offset: read.attribute("tOffset").map(Length::new::<meter>)?,
+            width: read.attribute_opt("width")?.map(Length::new::<meter>),
+        })
     }
 }
 

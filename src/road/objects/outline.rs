@@ -3,8 +3,6 @@ use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 use vec1::Vec1;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// An outline defines a series of corner points, including the height of the object relative to the
 /// road reference line. The inner area of the described outline may be filled with a filling type,
@@ -15,26 +13,6 @@ pub struct Outlines {
 }
 
 impl Outlines {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut outline = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "outline" true => |attributes| {
-                outline.push(Outline::from_events(events, attributes)?);
-                Ok(())
-            },
-        );
-
-        Ok(Self {
-            outline: Vec1::try_from_vec(outline)
-                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -52,6 +30,26 @@ impl Outlines {
             visit_children!(visitor, "outline" => outline);
         }
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Outlines
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut outline = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "outline" true => Outline => |v| outline.push(v),
+        );
+
+        Ok(Self {
+            outline: Vec1::try_from_vec(outline).unwrap(),
+        })
     }
 }
 
@@ -90,35 +88,6 @@ pub struct Outline {
 }
 
 impl Outline {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut choice = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "cornerRoad" => |attributes| {
-                choice.push(Corner::Road(CornerRoad::from_events(events, attributes)?));
-                Ok(())
-            },
-            "cornerLocal" => |attributes| {
-                choice.push(Corner::Local(CornerLocal::from_events(events, attributes)?));
-                Ok(())
-            },
-        );
-
-        Ok(Self {
-            closed: find_map_parse_attr!(attributes, "closed", Option<bool>)?,
-            fill_type: find_map_parse_attr!(attributes, "fillType", Option<OutlineFillType>)?,
-            id: find_map_parse_attr!(attributes, "id", Option<u64>)?,
-            lane_type: find_map_parse_attr!(attributes, "laneType", Option<LaneType>)?,
-            outer: find_map_parse_attr!(attributes, "outer", Option<bool>)?,
-            choice: Vec1::try_from_vec(choice)
-                .map_err(|_| crate::parser::Error::child_missing::<Self>())?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -146,6 +115,38 @@ impl Outline {
             }
         }
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Outline
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut choice = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "cornerRoad" => CornerRoad => |v| choice.push(Corner::Road(v)),
+            "cornerLocal" => CornerLocal => |v| choice.push(Corner::Local(v)),
+        );
+
+        Ok(Self {
+            closed: read.attribute_opt("closed")?,
+            fill_type: read.attribute_opt("fillType")?,
+            id: read.attribute_opt("id")?,
+            lane_type: read.attribute_opt("laneType")?,
+            outer: read.attribute_opt("outer")?,
+            choice: Vec1::try_from_vec(choice).map_err(|_| {
+                crate::parser::Error::missing_element(
+                    read.path().to_string(),
+                    "cornerRoad|cornerLocal",
+                    core::any::type_name::<Corner>(),
+                )
+            })?,
+        })
     }
 }
 
@@ -190,21 +191,6 @@ pub struct CornerRoad {
 }
 
 impl CornerRoad {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            dz: find_map_parse_attr!(attributes, "dz", f64).map(Length::new::<meter>)?,
-            height: find_map_parse_attr!(attributes, "height", f64).map(Length::new::<meter>)?,
-            id: find_map_parse_attr!(attributes, "id", Option<u64>)?,
-            s: find_map_parse_attr!(attributes, "s", f64).map(Length::new::<meter>)?,
-            t: find_map_parse_attr!(attributes, "t", f64).map(Length::new::<meter>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -227,6 +213,22 @@ impl CornerRoad {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for CornerRoad
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            dz: read.attribute("dz").map(Length::new::<meter>)?,
+            height: read.attribute("height").map(Length::new::<meter>)?,
+            id: read.attribute_opt("id")?,
+            s: read.attribute("s").map(Length::new::<meter>)?,
+            t: read.attribute("t").map(Length::new::<meter>)?,
+        })
     }
 }
 
@@ -262,21 +264,6 @@ pub struct CornerLocal {
 }
 
 impl CornerLocal {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            height: find_map_parse_attr!(attributes, "height", f64).map(Length::new::<meter>)?,
-            id: find_map_parse_attr!(attributes, "id", Option<u64>)?,
-            u: find_map_parse_attr!(attributes, "u", f64).map(Length::new::<meter>)?,
-            v: find_map_parse_attr!(attributes, "v", f64).map(Length::new::<meter>)?,
-            z: find_map_parse_attr!(attributes, "w", f64).map(Length::new::<meter>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -299,6 +286,23 @@ impl CornerLocal {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for CornerLocal
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            height: read.attribute("height").map(Length::new::<meter>)?,
+            id: read.attribute_opt("id")?,
+            u: read.attribute("u").map(Length::new::<meter>)?,
+            v: read.attribute("v").map(Length::new::<meter>)?,
+            z: read.attribute("z").map(Length::new::<meter>)?,
+        })
     }
 }
 

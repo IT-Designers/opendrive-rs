@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// To avoid lengthy XML code, objects of the same type may be repeated. Attributes of the repeated
 /// object shall overrule the attributes from the original object. If attributes are omitted in the
@@ -45,42 +43,6 @@ pub struct Repeat {
 }
 
 impl Repeat {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            distance: find_map_parse_attr!(attributes, "distance", f64)
-                .map(Length::new::<meter>)?,
-            height_end: find_map_parse_attr!(attributes, "heightEnd", f64)
-                .map(Length::new::<meter>)?,
-            height_start: find_map_parse_attr!(attributes, "heightStart", f64)
-                .map(Length::new::<meter>)?,
-            length: find_map_parse_attr!(attributes, "length", f64).map(Length::new::<meter>)?,
-            length_end: find_map_parse_attr!(attributes, "lengthEnd", Option<f64>)?
-                .map(Length::new::<meter>),
-            length_start: find_map_parse_attr!(attributes, "lengthStart", Option<f64>)?
-                .map(Length::new::<meter>),
-            radius_end: find_map_parse_attr!(attributes, "radiusEnd", Option<f64>)?
-                .map(Length::new::<meter>),
-            radius_start: find_map_parse_attr!(attributes, "radiusStart", Option<f64>)?
-                .map(Length::new::<meter>),
-            s: find_map_parse_attr!(attributes, "s", f64).map(Length::new::<meter>)?,
-            t_end: find_map_parse_attr!(attributes, "tEnd", f64).map(Length::new::<meter>)?,
-            t_start: find_map_parse_attr!(attributes, "tStart", f64).map(Length::new::<meter>)?,
-            width_end: find_map_parse_attr!(attributes, "widthEnd", Option<f64>)?
-                .map(Length::new::<meter>),
-            width_start: find_map_parse_attr!(attributes, "widthStart", Option<f64>)?
-                .map(Length::new::<meter>),
-            z_offset_end: find_map_parse_attr!(attributes, "zOffsetEnd", Option<f64>)?
-                .map(Length::new::<meter>),
-            z_offset_start: find_map_parse_attr!(attributes, "zOffsetStart", Option<f64>)?
-                .map(Length::new::<meter>),
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -113,6 +75,35 @@ impl Repeat {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Repeat
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            distance: read.attribute("distance").map(Length::new::<meter>)?,
+            height_end: read.attribute("heightEnd").map(Length::new::<meter>)?,
+            height_start: read.attribute("heightStart").map(Length::new::<meter>)?,
+            length: read.attribute("length").map(Length::new::<meter>)?,
+            length_end: read.attribute_opt("lengthEnd")?.map(Length::new::<meter>),
+            length_start: read.attribute_opt("lengthStart")?.map(Length::new::<meter>),
+            radius_end: read.attribute_opt("radiusEnd")?.map(Length::new::<meter>),
+            radius_start: read.attribute_opt("radiusStart")?.map(Length::new::<meter>),
+            s: read.attribute("s").map(Length::new::<meter>)?,
+            t_end: read.attribute("tEnd").map(Length::new::<meter>)?,
+            t_start: read.attribute("tStart").map(Length::new::<meter>)?,
+            width_end: read.attribute_opt("widthEnd")?.map(Length::new::<meter>),
+            width_start: read.attribute_opt("widthStart")?.map(Length::new::<meter>),
+            z_offset_end: read.attribute_opt("zOffsetEnd")?.map(Length::new::<meter>),
+            z_offset_start: read
+                .attribute_opt("zOffsetStart")?
+                .map(Length::new::<meter>),
+        })
     }
 }
 

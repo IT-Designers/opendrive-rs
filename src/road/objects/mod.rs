@@ -13,8 +13,6 @@ use uom::si::angle::radian;
 use uom::si::f64::Angle;
 use uom::si::f64::Length;
 use uom::si::length::meter;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 pub mod bridge;
 pub mod markings;
@@ -38,43 +36,6 @@ pub struct Objects {
 }
 
 impl Objects {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut object = Vec::new();
-        let mut object_reference = Vec::new();
-        let mut tunnel = Vec::new();
-        let mut bridge = Vec::new();
-
-        find_map_parse_elem!(
-            events,
-            "object" => |attributes| {
-                object.push(Object::from_events(events, attributes)?);
-                Ok(())
-            },
-            "objectReference" => |attributes| {
-                object_reference.push(ObjectReference::from_events(events, attributes)?);
-                Ok(())
-            },
-            "tunnel" => |attributes| {
-                tunnel.push(Tunnel::from_events(events, attributes)?);
-                Ok(())
-            },
-            "bridge" => |attributes| {
-                bridge.push(Bridge::from_events(events, attributes)?);
-                Ok(())
-            },
-        );
-
-        Ok(Self {
-            object,
-            object_reference,
-            tunnel,
-            bridge,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -105,6 +66,35 @@ impl Objects {
         }
 
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Objects
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut object = Vec::new();
+        let mut object_reference = Vec::new();
+        let mut tunnel = Vec::new();
+        let mut bridge = Vec::new();
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "object" => Object => |v| object.push(v),
+            "objectReference" => ObjectReference => |v| object_reference.push(v),
+            "tunnel" => Tunnel => |v| tunnel.push(v),
+            "bridge" => Bridge => |v| bridge.push(v),
+        );
+
+        Ok(Self {
+            object,
+            object_reference,
+            tunnel,
+            bridge,
+        })
     }
 }
 
@@ -172,92 +162,6 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut repeat = Vec::new();
-        let mut outline = None;
-        let mut outlines = None;
-        let mut material = Vec::new();
-        let mut validity = Vec::new();
-        let mut parking_space = None;
-        let mut markings = None;
-        let mut surface = None;
-
-        find_map_parse_elem!(
-            events,
-            "repeat" => |attributes| {
-                repeat.push(Repeat::from_events(events, attributes)?);
-                Ok(())
-            },
-            "outline" => |attributes| {
-                outline = Some(Outline::from_events(events, attributes)?);
-                Ok(())
-            },
-            "outlines" => |attributes| {
-                outlines = Some(Outlines::from_events(events, attributes)?);
-                Ok(())
-            },
-            "material" => |attributes| {
-                material.push(Material::from_events(events, attributes)?);
-                Ok(())
-            },
-            "validity" => |attributes| {
-                validity.push(LaneValidity::from_events(events, attributes)?);
-                Ok(())
-            },
-            "parkingSpace" => |attributes| {
-                parking_space = Some(ParkingSpace::from_events(events, attributes)?);
-                Ok(())
-            },
-            "markings" => |attributes| {
-                markings = Some(Markings::from_events(events, attributes)?);
-                Ok(())
-            },
-            "surface" => |attributes| {
-                surface = Some(Surface::from_events(events, attributes)?);
-                Ok(())
-            },
-        );
-
-        Ok(Self {
-            dynamic: find_map_parse_attr!(attributes, "dynamic", Option<String>)?
-                .map(|v| v.eq_ignore_ascii_case("yes")),
-            hdg: find_map_parse_attr!(attributes, "hdg", Option<f64>)?.map(Angle::new::<radian>),
-            height: find_map_parse_attr!(attributes, "height", Option<f64>)?
-                .map(Length::new::<meter>),
-            id: find_map_parse_attr!(attributes, "id", String)?,
-            length: find_map_parse_attr!(attributes, "length", Option<f64>)?
-                .map(Length::new::<meter>),
-            name: find_map_parse_attr!(attributes, "name", Option<String>)?,
-            orientation: find_map_parse_attr!(attributes, "orientation", Option<Orientation>)?,
-            perp_to_road: find_map_parse_attr!(attributes, "perpToRoad", Option<bool>)?,
-            pitch: find_map_parse_attr!(attributes, "pitch", Option<f64>)?
-                .map(Angle::new::<radian>),
-            radius: find_map_parse_attr!(attributes, "radius", Option<f64>)?
-                .map(Length::new::<meter>),
-            roll: find_map_parse_attr!(attributes, "roll", Option<f64>)?.map(Angle::new::<radian>),
-            s: find_map_parse_attr!(attributes, "s", f64).map(Length::new::<meter>)?,
-            subtype: find_map_parse_attr!(attributes, "subtype", Option<String>)?,
-            t: find_map_parse_attr!(attributes, "t", f64).map(Length::new::<meter>)?,
-            r#type: find_map_parse_attr!(attributes, "type", Option<ObjectType>)?,
-            valid_length: find_map_parse_attr!(attributes, "validLength", Option<f64>)?
-                .map(Length::new::<meter>),
-            width: find_map_parse_attr!(attributes, "width", Option<f64>)?
-                .map(Length::new::<meter>),
-            z_offset: find_map_parse_attr!(attributes, "zOffset", f64).map(Length::new::<meter>)?,
-            repeat,
-            outline,
-            outlines,
-            material,
-            validity,
-            parking_space,
-            markings,
-            surface,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -324,6 +228,73 @@ impl Object {
         }
 
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Object
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut repeat = Vec::new();
+        let mut outline = None;
+        let mut outlines = None;
+        let mut material = Vec::new();
+        let mut validity = Vec::new();
+        let mut parking_space = None;
+        let mut markings = None;
+        let mut surface = None;
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "repeat" => Repeat => |v| repeat.push(v),
+            "outline" => Outline => |v| outline = Some(v),
+            "outlines" => Outlines => |v| outlines = Some(v),
+            "material" => Material => |v| material.push(v),
+            "validity" => LaneValidity => |v| validity.push(v),
+            "parkingSpace" => ParkingSpace => |v| parking_space = Some(v),
+            "markings" => Markings => |v| markings = Some(v),
+            "surface" => Surface => |v| surface = Some(v),
+        );
+
+        Ok(Self {
+            dynamic: read
+                .attribute_opt::<String>("dynamic")?
+                .map(|v| v.eq_ignore_ascii_case("yes")),
+            hdg: read.attribute_opt("hdg")?.map(Angle::new::<radian>),
+            height: read.attribute_opt("height")?.map(Length::new::<meter>),
+            id: read.attribute("id")?,
+            length: read
+                .attribute_opt::<f64>("length")?
+                .map(Length::new::<meter>),
+            name: read.attribute_opt("name")?,
+            orientation: read.attribute_opt("orientation")?,
+            perp_to_road: read.attribute_opt("perpToRoad")?,
+            pitch: read
+                .attribute_opt::<f64>("pitch")?
+                .map(Angle::new::<radian>),
+            radius: read
+                .attribute_opt::<f64>("radius")?
+                .map(Length::new::<meter>),
+            roll: read.attribute_opt::<f64>("roll")?.map(Angle::new::<radian>),
+            s: read.attribute("s").map(Length::new::<meter>)?,
+            subtype: read.attribute_opt("subtype")?,
+            t: read.attribute("t").map(Length::new::<meter>)?,
+            r#type: read.attribute_opt("type")?,
+            valid_length: read.attribute_opt("validLength")?.map(Length::new::<meter>),
+            width: read.attribute_opt("width")?.map(Length::new::<meter>),
+            z_offset: read.attribute("zOffset").map(Length::new::<meter>)?,
+            repeat,
+            outline,
+            outlines,
+            material,
+            validity,
+            parking_space,
+            markings,
+            surface,
+        })
     }
 }
 

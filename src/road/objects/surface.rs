@@ -1,6 +1,4 @@
 use std::borrow::Cow;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// Used to describe the road surface elevation of an object.
 #[derive(Debug, Clone, PartialEq)]
@@ -10,23 +8,6 @@ pub struct Surface {
 }
 
 impl Surface {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        _attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        let mut crg = None;
-
-        find_map_parse_elem!(
-            events,
-            "CRG" => |attributes| {
-                crg = Some(Crg::from_events(events, attributes)?);
-                Ok(())
-            },
-        );
-
-        Ok(Self { crg })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -46,6 +27,23 @@ impl Surface {
         Ok(())
     }
 }
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Surface
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        let mut crg = None;
+
+        match_child_eq_ignore_ascii_case!(
+            read,
+            "CRG" => Crg => |v| crg = Some(v),,
+        );
+
+        Ok(Self { crg })
+    }
+}
 
 /// Elevation data described in {GLO_VAR_STA_ASAM_OpenCRG} are represented by the `<CRG>` element
 /// within the `<surface>` element.
@@ -60,23 +58,6 @@ pub struct Crg {
 }
 
 impl Crg {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            file: find_map_parse_attr!(attributes, "file", Option<String>)?,
-            hide_road_surface_crg: find_map_parse_attr!(
-                attributes,
-                "hideRoadSurfaceCRG",
-                Option<bool>
-            )?,
-            z_scale: find_map_parse_attr!(attributes, "zScale", Option<f64>)?,
-        })
-    }
-
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -97,6 +78,21 @@ impl Crg {
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
         Ok(())
+    }
+}
+
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Crg
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    type Error = crate::parser::Error;
+
+    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            file: read.attribute_opt("file")?,
+            hide_road_surface_crg: read.attribute_opt("hideRoadSurfaceCRG")?,
+            z_scale: read.attribute_opt("zScale")?,
+        })
     }
 }
 
