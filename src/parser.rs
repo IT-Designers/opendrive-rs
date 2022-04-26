@@ -89,6 +89,7 @@ where
         Ok(None)
     }
 
+    #[allow(clippy::type_complexity)] // for now, getting removed later on most properly anyway...
     pub fn elements(
         &mut self,
         mapper: &mut [(
