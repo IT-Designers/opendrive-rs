@@ -1,3 +1,4 @@
+use crate::road::unit::SpeedUnit;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
@@ -65,18 +66,3 @@ impl arbitrary::Arbitrary<'_> for Speed {
         })
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum SpeedUnit {
-    KilometersPerHour,
-    MetersPerSecond,
-    MilesPerHour,
-}
-
-impl_from_str_as_str!(
-    SpeedUnit,
-    "km/h" => KilometersPerHour,
-    "m/s" => MetersPerSecond,
-    "mph" => MilesPerHour,
-);

@@ -19,6 +19,32 @@ fuzz_target!(|data: OpenDrive| {
     let data_2 = data_2.unwrap();
 
     if data != data_2 {
+        let a = format!("{data:?}");
+        let b = format!("{data_2:?}");
+
+        let overlap = a
+            .chars()
+            .zip(b.chars())
+            .take_while(|(a, b)| a == b)
+            .count()
+            .saturating_sub(50);
+
+        let a = &a[overlap..];
+        let b = &b[overlap..];
+
+        eprintln!("----- {overlap} || {} vs {}", a.len(), b.len());
+        eprintln!("{}", &a[..50.min(a.len())]);
+        eprintln!("{}", &b[..50.min(b.len())]);
+        eprintln!("-----");
+
+        if let Some(index) = b.find(": NaN") {
+            let b = &b[index.saturating_sub(100)..];
+
+            eprintln!("  ~~~~ NaN detected ~~~~ ");
+            eprintln!("{}", &b[..100.min(b.len())]);
+            eprintln!("  ~~~~ NaN detected ~~~~ ");
+        }
+
         dbg!(core::str::from_utf8(&bytes).unwrap());
     }
 

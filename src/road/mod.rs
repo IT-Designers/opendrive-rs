@@ -3,14 +3,19 @@ use crate::road::geometry::PlanView;
 use crate::road::lane::Lanes;
 use crate::road::objects::Objects;
 use crate::road::profile::{ElevationProfile, LateralProfile};
+use crate::road::signals::Signals;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 
+#[allow(deprecated)]
+pub mod country_code;
 pub mod geometry;
 pub mod lane;
 pub mod objects;
 pub mod profile;
+pub mod signals;
+pub mod unit;
 
 /// In ASAM OpenDRIVE, the road network is represented by `<road>` elements. Each road runs along
 /// one road reference line. A road shall have at least one lane with a width larger than 0.
@@ -44,10 +49,11 @@ pub struct Road {
     pub lateral_profile: Option<LateralProfile>,
     pub lanes: Lanes,
     pub objects: Option<Objects>,
-    // pub signals: (),
-    // pub surface: (),
-    // pub raildroad: (),
+    pub signals: Option<Signals>,
+    // pub surface: Option<()>,
+    // pub raildroad: Option<()>,
 }
+
 impl Road {
     pub fn visit_attributes(
         &self,
@@ -85,6 +91,10 @@ impl Road {
             visit_children!(visitor, "objects" => objects);
         }
 
+        if let Some(signals) = &self.signals {
+            visit_children!(visitor, "signals" => signals);
+        }
+
         visit_children!(
             visitor,
             "planView" => self.plan_view,
@@ -108,6 +118,7 @@ where
         let mut lateral_profile = None;
         let mut lanes = None;
         let mut objects = None;
+        let mut signals = None;
 
         match_child_eq_ignore_ascii_case!(
             read,
@@ -117,6 +128,7 @@ where
             "lateralProfile" => LateralProfile => |v| lateral_profile = Some(v),
             "lanes" true => Lanes => |v| lanes = Some(v),
             "objects" => Objects => |v| objects = Some(v),
+            "signals" => Signals => |v| signals = Some(v),
         );
 
         Ok(Self {
@@ -131,6 +143,7 @@ where
             lateral_profile,
             lanes: lanes.unwrap(),
             objects,
+            signals,
         })
     }
 }
@@ -151,6 +164,7 @@ impl arbitrary::Arbitrary<'_> for Road {
             lateral_profile: u.arbitrary()?,
             lanes: u.arbitrary()?,
             objects: u.arbitrary()?,
+            signals: u.arbitrary()?,
         })
     }
 }
