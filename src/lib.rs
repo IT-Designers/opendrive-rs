@@ -90,10 +90,4 @@ mod tests {
             "#;
         let _ = OpenDrive::from_reader(EventReader::from_str(source)).unwrap();
     }
-
-    #[test]
-    pub fn test_xml_include_str() {
-        let source = include_str!("/home/mi7wa6/projects/research/ASAM_OpenDRIVE_BS_V1-7-0/examples_and_use_cases/Ex_Poly3/Ex_Poly3.xodr");
-        let _ = OpenDrive::from_reader(EventReader::from_str(source)).unwrap();
-    }
 }
