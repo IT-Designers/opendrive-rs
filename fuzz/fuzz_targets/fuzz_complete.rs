@@ -12,6 +12,7 @@ fuzz_target!(|data: OpenDrive| {
     let data_2 = OpenDrive::from_reader(reader);
 
     if data_2.is_err() {
+        eprintln!("{}", data_2.as_ref().unwrap_err());
         dbg!(core::str::from_utf8(&bytes).unwrap());
     }
 
