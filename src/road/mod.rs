@@ -1,6 +1,7 @@
 use crate::junction::{ContactPoint, ElementDir};
 use crate::road::geometry::PlanView;
 use crate::road::lane::Lanes;
+use crate::road::objects::surface::Surface;
 use crate::road::objects::Objects;
 use crate::road::profile::{ElevationProfile, LateralProfile};
 use crate::road::signals::Signals;
@@ -50,7 +51,7 @@ pub struct Road {
     pub lanes: Lanes,
     pub objects: Option<Objects>,
     pub signals: Option<Signals>,
-    // pub surface: Option<()>,
+    pub surface: Option<Surface>,
     // pub raildroad: Option<()>,
 }
 
@@ -95,6 +96,10 @@ impl Road {
             visit_children!(visitor, "signals" => signals);
         }
 
+        if let Some(surface) = &self.surface {
+            visit_children!(visitor, "surface" => surface);
+        }
+
         visit_children!(
             visitor,
             "planView" => self.plan_view,
@@ -119,6 +124,7 @@ where
         let mut lanes = None;
         let mut objects = None;
         let mut signals = None;
+        let mut surface = None;
 
         match_child_eq_ignore_ascii_case!(
             read,
@@ -129,6 +135,7 @@ where
             "lanes" true => Lanes => |v| lanes = Some(v),
             "objects" => Objects => |v| objects = Some(v),
             "signals" => Signals => |v| signals = Some(v),
+            "surface" => Surface => |v| surface = Some(v),
         );
 
         Ok(Self {
@@ -144,6 +151,7 @@ where
             lanes: lanes.unwrap(),
             objects,
             signals,
+            surface,
         })
     }
 }
@@ -165,6 +173,7 @@ impl arbitrary::Arbitrary<'_> for Road {
             lanes: u.arbitrary()?,
             objects: u.arbitrary()?,
             signals: u.arbitrary()?,
+            surface: u.arbitrary()?,
         })
     }
 }
