@@ -46,22 +46,28 @@ impl arbitrary::Arbitrary<'_> for CountryCode {
         if u.arbitrary()? {
             Ok(Self::CountryCodeDeprecated(u.arbitrary()?))
         } else if u.arbitrary()? {
-            Ok(Self::Iso3166alpha2(
-                u.arbitrary_iter()?
-                    .filter_map(Result::ok)
-                    .filter(char::is_ascii_alphabetic)
-                    .take(2)
-                    .collect::<String>(),
-            ))
+            Ok(Self::Iso3166alpha2({
+                let mut string = String::with_capacity(2);
+                while string.len() < 2 {
+                    let c = char::from(u.int_in_range('A' as u8..='Z' as u8)?);
+                    if c.is_ascii_alphabetic() {
+                        string.push(c);
+                    }
+                }
+                string
+            }))
         } else {
             #[allow(deprecated)]
-            Ok(Self::Iso3166alpha3(
-                u.arbitrary_iter()?
-                    .filter_map(Result::ok)
-                    .filter(char::is_ascii_alphabetic)
-                    .take(3)
-                    .collect::<String>(),
-            ))
+            Ok(Self::Iso3166alpha3({
+                let mut string = String::with_capacity(3);
+                while string.len() < 3 {
+                    let c = char::from(u.int_in_range('A' as u8..='Z' as u8)?);
+                    if c.is_ascii_alphabetic() {
+                        string.push(c);
+                    }
+                }
+                string
+            }))
         }
     }
 }

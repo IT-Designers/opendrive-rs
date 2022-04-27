@@ -21,7 +21,7 @@ pub mod speed;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lanes {
     pub lane_offset: Vec<Offset>,
-    pub lane_section: Vec1<Section>,
+    pub lane_section: Vec1<LaneSection>,
 }
 
 impl Lanes {
@@ -61,7 +61,7 @@ where
         match_child_eq_ignore_ascii_case!(
             read,
             "laneOffset" => Offset => |v| lane_offset.push(v),
-            "laneSection" true => Section => |v| lane_section.push(v),
+            "laneSection" true => LaneSection => |v| lane_section.push(v),
         );
 
         Ok(Self {
@@ -161,7 +161,7 @@ impl arbitrary::Arbitrary<'_> for Offset {
 /// lanes. Every time the number of lanes changes, a new lane section is required. The distance
 /// between two succeeding lane sections shall not be zero.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Section {
+pub struct LaneSection {
     /// s-coordinate of start position
     pub s: f64,
     /// Lane section element is valid for one side only (left, center, or right), depending on the
@@ -172,7 +172,7 @@ pub struct Section {
     pub right: Option<Right>,
 }
 
-impl Section {
+impl LaneSection {
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -204,7 +204,7 @@ impl Section {
     }
 }
 
-impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Section
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for LaneSection
 where
     I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
 {
@@ -233,7 +233,7 @@ where
 }
 
 #[cfg(feature = "fuzzing")]
-impl arbitrary::Arbitrary<'_> for Section {
+impl arbitrary::Arbitrary<'_> for LaneSection {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         use crate::fuzzing::NotNan;
         Ok(Self {

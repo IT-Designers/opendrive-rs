@@ -37,7 +37,7 @@ fuzz_target!(|data: OpenDrive| {
         eprintln!("{}", &b[..50.min(b.len())]);
         eprintln!("-----");
 
-        if let Some(index) = b.find(": NaN") {
+        if let Some(index) = b.find("NaN") {
             let b = &b[index.saturating_sub(100)..];
 
             eprintln!("  ~~~~ NaN detected ~~~~ ");
@@ -45,7 +45,7 @@ fuzz_target!(|data: OpenDrive| {
             eprintln!("  ~~~~ NaN detected ~~~~ ");
         }
 
-        dbg!(core::str::from_utf8(&bytes).unwrap());
+        // dbg!(core::str::from_utf8(&bytes).unwrap());
     }
 
     assert_eq!(data, data_2);

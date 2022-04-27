@@ -4,6 +4,7 @@ use crate::road::lane::Lanes;
 use crate::road::objects::surface::Surface;
 use crate::road::objects::Objects;
 use crate::road::profile::{ElevationProfile, LateralProfile};
+use crate::road::railroad::Railroad;
 use crate::road::signals::Signals;
 use std::borrow::Cow;
 use uom::si::f64::Length;
@@ -15,6 +16,7 @@ pub mod geometry;
 pub mod lane;
 pub mod objects;
 pub mod profile;
+pub mod railroad;
 pub mod signals;
 pub mod unit;
 
@@ -52,7 +54,7 @@ pub struct Road {
     pub objects: Option<Objects>,
     pub signals: Option<Signals>,
     pub surface: Option<Surface>,
-    // pub raildroad: Option<()>,
+    pub railroad: Option<Railroad>,
 }
 
 impl Road {
@@ -100,6 +102,10 @@ impl Road {
             visit_children!(visitor, "surface" => surface);
         }
 
+        if let Some(railroad) = &self.railroad {
+            visit_children!(visitor, "railroad" => railroad);
+        }
+
         visit_children!(
             visitor,
             "planView" => self.plan_view,
@@ -125,6 +131,7 @@ where
         let mut objects = None;
         let mut signals = None;
         let mut surface = None;
+        let mut railroad = None;
 
         match_child_eq_ignore_ascii_case!(
             read,
@@ -136,6 +143,7 @@ where
             "objects" => Objects => |v| objects = Some(v),
             "signals" => Signals => |v| signals = Some(v),
             "surface" => Surface => |v| surface = Some(v),
+            "railroad" => Railroad => |v| railroad = Some(v),
         );
 
         Ok(Self {
@@ -152,6 +160,7 @@ where
             objects,
             signals,
             surface,
+            railroad,
         })
     }
 }
@@ -174,6 +183,7 @@ impl arbitrary::Arbitrary<'_> for Road {
             objects: u.arbitrary()?,
             signals: u.arbitrary()?,
             surface: u.arbitrary()?,
+            railroad: u.arbitrary()?,
         })
     }
 }

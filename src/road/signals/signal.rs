@@ -211,7 +211,10 @@ impl arbitrary::Arbitrary<'_> for Signal {
             text: u.arbitrary()?,
             r#type: u.arbitrary()?,
             unit: u.arbitrary()?,
-            value: u.arbitrary()?,
+            value: u
+                .arbitrary::<Option<()>>()?
+                .map(|_| u.not_nan_f64())
+                .transpose()?,
             width: u
                 .arbitrary::<Option<()>>()?
                 .map(|_| u.not_nan_f64().map(Length::new::<meter>))
