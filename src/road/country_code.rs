@@ -11,8 +11,8 @@ impl CountryCode {
     pub fn as_str(&self) -> &str {
         match self {
             Self::CountryCodeDeprecated(code) => code.as_str(),
-            Self::Iso3166alpha2(v) => &v,
-            Self::Iso3166alpha3(v) => &v,
+            Self::Iso3166alpha2(v) => v,
+            Self::Iso3166alpha3(v) => v,
         }
     }
 }
