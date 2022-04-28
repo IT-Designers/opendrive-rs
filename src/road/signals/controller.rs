@@ -66,7 +66,6 @@ where
 #[cfg(feature = "fuzzing")]
 impl arbitrary::Arbitrary<'_> for Controller {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
-        use crate::fuzzing::NotNan;
         Ok(Self {
             control: {
                 let mut vec1 = Vec1::new(u.arbitrary()?);
