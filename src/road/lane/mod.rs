@@ -587,7 +587,7 @@ where
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lane {
     pub link: Option<LaneLink>,
-    pub choice: Vec1<LaneChoice>,
+    pub choice: Vec<LaneChoice>,
     pub road_mark: Vec<RoadMark>,
     pub material: Vec<Material>,
     pub speed: Vec<Speed>,
@@ -689,13 +689,7 @@ where
 
         Ok(Self {
             link,
-            choice: Vec1::try_from_vec(choice).map_err(|_| {
-                crate::parser::Error::missing_element(
-                    read.path().to_string(),
-                    "border|width",
-                    core::any::type_name::<LaneChoice>(),
-                )
-            })?,
+            choice,
             road_mark,
             material,
             speed,
@@ -713,11 +707,7 @@ impl arbitrary::Arbitrary<'_> for Lane {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         Ok(Self {
             link: u.arbitrary()?,
-            choice: {
-                let mut vec1 = Vec1::new(u.arbitrary()?);
-                vec1.extend(u.arbitrary::<Vec<_>>()?);
-                vec1
-            },
+            choice: u.arbitrary()?,
             road_mark: u.arbitrary()?,
             material: u.arbitrary()?,
             speed: u.arbitrary()?,

@@ -2,6 +2,7 @@ use crate::road::signals::signal::Signal;
 use crate::road::signals::signal_reference::SignalReference;
 use std::borrow::Cow;
 
+pub mod controller;
 pub mod dependency;
 pub mod position;
 pub mod reference;

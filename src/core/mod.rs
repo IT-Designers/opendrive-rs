@@ -1,3 +1,4 @@
+use crate::road::signals::controller::Controller;
 use crate::road::Road;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use std::borrow::Cow;
@@ -13,7 +14,11 @@ pub mod additional_data;
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct OpenDrive {
     pub header: Header,
-    pub roads: Vec<Road>,
+    pub road: Vec<Road>,
+    pub controller: Vec<Controller>,
+    // pub junction: Vec<Junction>,
+    // pub junction_group: Vec<JunctionGroup>,
+    // pub station: Vec<Station>,
 }
 
 impl OpenDrive {
@@ -82,9 +87,15 @@ impl OpenDrive {
         mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
         visit_children!(visitor, "header" => self.header);
-        for road in &self.roads {
+
+        for road in &self.road {
             visit_children!(visitor, "road" => road);
         }
+
+        for controller in &self.controller {
+            visit_children!(visitor, "controller" => controller);
+        }
+
         Ok(())
     }
 }
@@ -98,16 +109,19 @@ where
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut header = None;
         let mut roads = Vec::new();
+        let mut controller = Vec::new();
 
         match_child_eq_ignore_ascii_case!(
             read,
             "header" true => Header => |v| header = Some(v),
             "road" => Road => |v| roads.push(v),
+            "controller" => Controller => |v| controller.push(v),
         );
 
         Ok(Self {
             header: header.unwrap(),
-            roads,
+            road: roads,
+            controller,
         })
     }
 }
