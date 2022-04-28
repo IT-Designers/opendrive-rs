@@ -183,7 +183,7 @@ impl LaneLink {
         visit_attributes!(
             visitor,
             "from" => &self.from.to_string(),
-            "to" => &self.from.to_string(),
+            "to" => &self.to.to_string(),
         )
     }
 

@@ -100,7 +100,7 @@ where
     fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         Ok(Self {
             file: read.attribute("file")?,
-            mode: read.attribute("read")?,
+            mode: read.attribute("mode")?,
             purpose: read.attribute_opt("purpose")?,
             z_offset: read.attribute_opt("zOffset")?.map(Length::new::<meter>),
             z_scale: read.attribute_opt("zScale")?,
