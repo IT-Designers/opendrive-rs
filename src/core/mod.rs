@@ -1,3 +1,4 @@
+use crate::junction::Junction;
 use crate::road::signals::controller::Controller;
 use crate::road::Road;
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -16,7 +17,7 @@ pub struct OpenDrive {
     pub header: Header,
     pub road: Vec<Road>,
     pub controller: Vec<Controller>,
-    // pub junction: Vec<Junction>,
+    pub junction: Vec<Junction>,
     // pub junction_group: Vec<JunctionGroup>,
     // pub station: Vec<Station>,
 }
@@ -96,6 +97,10 @@ impl OpenDrive {
             visit_children!(visitor, "controller" => controller);
         }
 
+        for junction in &self.junction {
+            visit_children!(visitor, "junction" => junction);
+        }
+
         Ok(())
     }
 }
@@ -110,18 +115,21 @@ where
         let mut header = None;
         let mut roads = Vec::new();
         let mut controller = Vec::new();
+        let mut junction = Vec::new();
 
         match_child_eq_ignore_ascii_case!(
             read,
             "header" true => Header => |v| header = Some(v),
             "road" => Road => |v| roads.push(v),
             "controller" => Controller => |v| controller.push(v),
+            "junction" => Junction => |v| junction.push(v),
         );
 
         Ok(Self {
             header: header.unwrap(),
             road: roads,
             controller,
+            junction,
         })
     }
 }
