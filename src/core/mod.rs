@@ -102,6 +102,10 @@ impl OpenDrive {
             visit_children!(visitor, "junction" => junction);
         }
 
+        for junction_group in &self.junction_group {
+            visit_children!(visitor, "junctionGroup" => junction_group);
+        }
+
         Ok(())
     }
 }
