@@ -437,7 +437,7 @@ pub struct ParamPoly3 {
     /// Range of parameter p.
     ///   * Case arcLength: p in [0, @length of `<geometry>`]
     ///   * Case normalized: p in [0, 1]
-    pub p_range: f64,
+    pub p_range: ParamPoly3pRange,
 }
 
 impl ParamPoly3 {
@@ -457,7 +457,7 @@ impl ParamPoly3 {
             "cV" => &self.c_v.to_scientific_string(),
             "dU" => &self.d_u.to_scientific_string(),
             "dV" => &self.d_v.to_scientific_string(),
-            "pRange" => &self.p_range.to_scientific_string(),
+            "pRange" => &self.p_range.as_str(),
         )
     }
 
@@ -504,7 +504,20 @@ impl arbitrary::Arbitrary<'_> for ParamPoly3 {
             c_v: u.not_nan_f64()?,
             d_u: u.not_nan_f64()?,
             d_v: u.not_nan_f64()?,
-            p_range: u.not_nan_f64()?,
+            p_range: u.arbitrary()?,
         })
     }
 }
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub enum ParamPoly3pRange {
+    ArcLength,
+    Normalized,
+}
+
+impl_from_str_as_str!(
+    ParamPoly3pRange,
+    "arcLength" => ArcLength,
+    "normalized" => Normalized,
+);
