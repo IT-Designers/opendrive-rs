@@ -6,7 +6,10 @@ use std::borrow::Cow;
 
 pub mod main_track;
 pub mod partner;
+pub mod platform;
+pub mod segment;
 pub mod side_track;
+pub mod station;
 pub mod switch_position;
 
 /// Container for all railroad definitions that shall be applied along a road.
