@@ -13,6 +13,7 @@ pub mod access;
 pub mod height;
 pub mod mark;
 pub mod material;
+pub mod road_mark_weight;
 pub mod rule;
 pub mod speed;
 

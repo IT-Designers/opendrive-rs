@@ -14,6 +14,7 @@ use uom::si::f64::Angle;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 
+pub mod borders;
 pub mod bridge;
 pub mod markings;
 pub mod material;
@@ -21,6 +22,8 @@ pub mod outline;
 pub mod parking;
 pub mod reference;
 pub mod repeat;
+pub mod road_mark_color;
+pub mod side_type;
 pub mod surface;
 pub mod tunnel;
 pub mod validity;
@@ -158,6 +161,7 @@ pub struct Object {
     pub validity: Vec<LaneValidity>,
     pub parking_space: Option<ParkingSpace>,
     pub markings: Option<Markings>,
+    pub borders: Option<Borders>,
     pub surface: Option<Surface>,
 }
 
@@ -245,6 +249,7 @@ where
         let mut validity = Vec::new();
         let mut parking_space = None;
         let mut markings = None;
+        let mut borders = None;
         let mut surface = None;
 
         match_child_eq_ignore_ascii_case!(
@@ -256,6 +261,7 @@ where
             "validity" => LaneValidity => |v| validity.push(v),
             "parkingSpace" => ParkingSpace => |v| parking_space = Some(v),
             "markings" => Markings => |v| markings = Some(v),
+            "borders" => Borders => |v| borders = Some(v),
             "surface" => Surface => |v| surface = Some(v),
         );
 
@@ -293,6 +299,7 @@ where
             validity,
             parking_space,
             markings,
+            borders,
             surface,
         })
     }
@@ -380,6 +387,7 @@ impl_from_str_as_str!(
     "none" => None,
 );
 
+use crate::road::objects::borders::Borders;
 pub use allow_deprecated::ObjectType;
 
 #[allow(deprecated)]

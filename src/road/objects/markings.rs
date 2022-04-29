@@ -1,9 +1,11 @@
+use crate::road::lane::road_mark_weight::RoadMarkWeight;
+use crate::road::objects::borders::CornerReference;
+use crate::road::objects::road_mark_color::RoadMarkColor;
+use crate::road::objects::side_type::SideType;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 use vec1::Vec1;
-use xml::attribute::OwnedAttribute;
-use xml::reader::XmlEvent;
 
 /// Describes the appearance of the parking space with multiple marking elements.
 #[derive(Debug, Clone, PartialEq)]
@@ -69,15 +71,25 @@ impl arbitrary::Arbitrary<'_> for Markings {
 /// referencing outline points.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Marking {
-    /// ID of the outline to use
-    pub outline_id: u64,
-    /// Appearance of border
-    pub r#type: BorderType,
-    /// Use all outline points for border. “true” is used as default.
-    pub use_complete_outline: Option<bool>,
-    /// Border width
-    pub width: Length,
     pub corner_reference: Vec<CornerReference>,
+    /// Color of the marking
+    pub color: RoadMarkColor,
+    /// Length of the visible part
+    pub line_length: Length,
+    /// Side of the bounding box described in `<object>` element in the local coordinate system u/v
+    pub side: Option<SideType>,
+    /// Length of the gap between the visible parts
+    pub space_length: Length,
+    /// Lateral offset in u-direction from start of bounding box side where the first marking starts
+    pub start_offset: Length,
+    /// Lateral offset in u-direction from end of bounding box side where the marking ends
+    pub stop_offset: Length,
+    /// Optical "weight" of the marking
+    pub weight: Option<RoadMarkWeight>,
+    /// Width of the marking
+    pub width: Option<Length>,
+    /// Height of road mark above the road, i.e. thickness of the road mark
+    pub z_offset: Option<Length>,
 }
 
 impl Marking {
@@ -89,10 +101,15 @@ impl Marking {
     ) -> xml::writer::Result<()> {
         visit_attributes_flatten!(
             visitor,
-            "outlineId" => Some(self.outline_id.to_string()).as_deref(),
-            "type" => Some(self.r#type.as_str()),
-            "useCompleteOutline" => self.use_complete_outline.map(|v| v.to_string()).as_deref(),
-            "width" => Some(self.width.value.to_scientific_string()).as_deref(),
+            "color" => Some(self.color.as_str()),
+            "lineLength" => Some(self.line_length.value.to_scientific_string()).as_deref(),
+            "side" => self.side.as_ref().map(SideType::as_str),
+            "spaceLength" => Some(self.space_length.value.to_scientific_string()).as_deref(),
+            "startOffset" => Some(self.start_offset.value.to_scientific_string()).as_deref(),
+            "stopOffset" => Some(self.stop_offset.value.to_scientific_string()).as_deref(),
+            "weight" => self.weight.as_ref().map(RoadMarkWeight::as_str),
+            "width" => self.width.map(|v| v.value.to_scientific_string()).as_deref(),
+            "z_offset" => self.z_offset.map(|v| v.value.to_scientific_string()).as_deref(),
         )
     }
 
@@ -122,11 +139,16 @@ where
         );
 
         Ok(Self {
-            outline_id: read.attribute("outlineId")?,
-            r#type: read.attribute("type")?,
-            use_complete_outline: read.attribute_opt("useCompleteOutline")?,
-            width: read.attribute("width").map(Length::new::<meter>)?,
             corner_reference,
+            color: read.attribute("color")?,
+            line_length: read.attribute("lineLength").map(Length::new::<meter>)?,
+            side: read.attribute_opt("side")?,
+            space_length: read.attribute("spaceLength").map(Length::new::<meter>)?,
+            start_offset: read.attribute("startOffset").map(Length::new::<meter>)?,
+            stop_offset: read.attribute("stopOffset").map(Length::new::<meter>)?,
+            weight: read.attribute_opt("weight")?,
+            width: read.attribute_opt("width")?.map(Length::new::<meter>),
+            z_offset: read.attribute_opt("zOffset")?.map(Length::new::<meter>),
         })
     }
 }
@@ -137,77 +159,23 @@ impl arbitrary::Arbitrary<'_> for Marking {
         use crate::fuzzing::NotNan;
         Ok(Self {
             corner_reference: u.arbitrary()?,
-            outline_id: u.arbitrary()?,
-            r#type: u.arbitrary()?,
-            use_complete_outline: u.arbitrary()?,
-            width: Length::new::<meter>(u.not_nan_f64()?),
+            color: u.arbitrary()?,
+            line_length: Length::new::<meter>(u.not_nan_f64()?),
+            side: u.arbitrary()?,
+            space_length: Length::new::<meter>(u.not_nan_f64()?),
+            start_offset: Length::new::<meter>(u.not_nan_f64()?),
+            stop_offset: Length::new::<meter>(u.not_nan_f64()?),
+            weight: u.arbitrary()?,
+            width: u
+                .arbitrary::<Option<()>>()?
+                .map(|_| u.not_nan_f64())
+                .transpose()?
+                .map(Length::new::<meter>),
+            z_offset: u
+                .arbitrary::<Option<()>>()?
+                .map(|_| u.not_nan_f64())
+                .transpose()?
+                .map(Length::new::<meter>),
         })
     }
 }
-
-/// Specifies a point by referencing an existing outline point.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub struct CornerReference {
-    /// Identifier of the referenced outline point
-    pub id: u64,
-}
-
-impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for CornerReference
-where
-    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
-{
-    type Error = crate::parser::Error;
-
-    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            id: read.attribute("id")?,
-        })
-    }
-}
-
-impl CornerReference {
-    pub fn from_events(
-        events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
-        attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
-        find_map_parse_elem!(events);
-
-        Ok(Self {
-            id: find_map_parse_attr!(attributes, "id", u64)?,
-        })
-    }
-
-    pub fn visit_attributes(
-        &self,
-        visitor: impl for<'b> FnOnce(
-            Cow<'b, [xml::attribute::Attribute<'b>]>,
-        ) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        visit_attributes!(
-            visitor,
-            "id" => &self.id.to_string(),
-        )
-    }
-
-    pub fn visit_children(
-        &self,
-        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        visit_children!(visitor);
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum BorderType {
-    Concrete,
-    Curb,
-}
-
-impl_from_str_as_str!(
-    BorderType,
-    "concrete" => Concrete,
-    "curb" => Curb,
-);
