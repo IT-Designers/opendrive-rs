@@ -10,6 +10,8 @@ use vec1::Vec1;
 
 pub mod connection;
 pub mod controller;
+pub mod junction_group;
+pub mod junction_reference;
 pub mod priority;
 pub mod surface;
 

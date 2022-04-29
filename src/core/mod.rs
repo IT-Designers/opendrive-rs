@@ -1,3 +1,4 @@
+use crate::junction::junction_group::JunctionGroup;
 use crate::junction::Junction;
 use crate::road::signals::controller::Controller;
 use crate::road::Road;
@@ -18,7 +19,7 @@ pub struct OpenDrive {
     pub road: Vec<Road>,
     pub controller: Vec<Controller>,
     pub junction: Vec<Junction>,
-    // pub junction_group: Vec<JunctionGroup>,
+    pub junction_group: Vec<JunctionGroup>,
     // pub station: Vec<Station>,
 }
 
@@ -116,6 +117,7 @@ where
         let mut roads = Vec::new();
         let mut controller = Vec::new();
         let mut junction = Vec::new();
+        let mut junction_group = Vec::new();
 
         match_child_eq_ignore_ascii_case!(
             read,
@@ -123,6 +125,7 @@ where
             "road" => Road => |v| roads.push(v),
             "controller" => Controller => |v| controller.push(v),
             "junction" => Junction => |v| junction.push(v),
+            "junctionGroup" => JunctionGroup => |v| junction_group.push(v),
         );
 
         Ok(Self {
@@ -130,6 +133,7 @@ where
             road: roads,
             controller,
             junction,
+            junction_group,
         })
     }
 }

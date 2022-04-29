@@ -64,6 +64,7 @@ impl arbitrary::Arbitrary<'_> for Borders {
         })
     }
 }
+
 /// Specifies a border along certain outline points.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Border {
