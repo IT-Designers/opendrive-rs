@@ -4,6 +4,7 @@ use crate::road::lane::Lanes;
 use crate::road::objects::surface::Surface;
 use crate::road::objects::Objects;
 use crate::road::profile::{ElevationProfile, LateralProfile};
+use crate::road::r#type::Type;
 use crate::road::railroad::Railroad;
 use crate::road::signals::Signals;
 use std::borrow::Cow;
@@ -18,6 +19,8 @@ pub mod objects;
 pub mod profile;
 pub mod railroad;
 pub mod signals;
+pub mod speed;
+pub mod r#type;
 pub mod unit;
 
 /// In ASAM OpenDRIVE, the road network is represented by `<road>` elements. Each road runs along
@@ -47,6 +50,7 @@ pub struct Road {
     /// attribute is missing, RHT is assumed.
     pub rule: Option<Rule>,
     pub link: Option<Link>,
+    pub r#type: Vec<Type>,
     pub plan_view: PlanView,
     pub elevation_profile: Option<ElevationProfile>,
     pub lateral_profile: Option<LateralProfile>,
@@ -80,6 +84,10 @@ impl Road {
     ) -> xml::writer::Result<()> {
         if let Some(link) = &self.link {
             visit_children!(visitor, "link" => link);
+        }
+
+        for r#type in &self.r#type {
+            visit_children!(visitor, "type" => r#type);
         }
 
         if let Some(elevation) = &self.elevation_profile {
@@ -124,6 +132,7 @@ where
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut link = None;
+        let mut r#type = Vec::new();
         let mut plan_view = None;
         let mut elevation_profile = None;
         let mut lateral_profile = None;
@@ -136,6 +145,7 @@ where
         match_child_eq_ignore_ascii_case!(
             read,
             "link" => Link => |v| link = Some(v),
+            "type" => Type => |v| r#type.push(v),
             "planView" true => PlanView => |v| plan_view = Some(v),
             "elevationProfile" => ElevationProfile => |v| elevation_profile = Some(v),
             "lateralProfile" => LateralProfile => |v| lateral_profile = Some(v),
@@ -153,6 +163,7 @@ where
             name: read.attribute_opt("name")?,
             rule: read.attribute_opt("rule")?,
             link,
+            r#type,
             plan_view: plan_view.unwrap(),
             elevation_profile,
             lateral_profile,
