@@ -462,45 +462,47 @@ macro_rules! find_map_parse_elem {
 macro_rules! match_child_eq_ignore_ascii_case {
     ($context:ident, $($name:literal $($req:literal)? => $ty:ty => $consumer:expr,)* $(_ => $alt:expr)? $(,)?) => {
         $(
-            paste::paste!{
-                #[allow(non_snake_case)]
-                let mut [<__is_missing_ $name>] = {
-                    #[allow(unused_mut, unused_assignments)]
-                    let mut r = false;
-                    $(r = $req;)?
-                    r
-                };
-            }
+            $(
+                paste::paste!{
+                    #[allow(non_snake_case)]
+                    let mut [<__is_missing_ $name>]: bool = $req;
+                }
+            )?
         )*
 
         $context.children(|name, context| {
-            paste::paste!{
-                match name {
-                    $(
-                        _ if $name.eq_ignore_ascii_case(name) => {
-                            let v = <$ty as TryFrom<_>>::try_from(context)?;
-                            #[allow(redundant_closure_call)]
-                            let _ = ($consumer)(v);
-                            [<__is_missing_ $name>] = false;
-                            Ok(())
-                        },
-                    )*
-                    _ => Ok(()),
-                }
+            match name {
+                $(
+                    _ if $name.eq_ignore_ascii_case(name) => {
+                        let v = <$ty as TryFrom<_>>::try_from(context)?;
+                        #[allow(redundant_closure_call)]
+                        let _ = ($consumer)(v);
+                        $(
+                            paste::paste!{
+                                let _: bool = $req;
+                                [<__is_missing_ $name>] = false;
+                            }
+                        )?
+                        Ok(())
+                    },
+                )*
+                _ => Ok(()),
             }
         })?;
 
         $(
-            paste::paste!{
-                if [<__is_missing_ $name>] {
-                    $(let _: bool = $req;)?
-                    return Err($crate::parser::Error::missing_element(
-                        $context.path().to_string(),
-                        $name,
-                        stringify!($ty),
-                    ));
-                };
-            }
+            $(
+                paste::paste!{
+                    if [<__is_missing_ $name>] {
+                        let _: bool = $req;
+                        return Err($crate::parser::Error::missing_element(
+                            $context.path().to_string(),
+                            $name,
+                            stringify!($ty),
+                        ));
+                    };
+                }
+            )?
         )*
 
     }
