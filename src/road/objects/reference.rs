@@ -11,20 +11,20 @@ use uom::si::length::meter;
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjectReference {
     /// Unique ID of the referred object within the database
-    id: String,
+    pub id: String,
     /// - "+" = valid in positive s-direction
     /// - "-" = valid in negative s-direction
     /// - "none" = valid in both directions
-    orientation: Orientation,
+    pub orientation: Orientation,
     /// s-coordinate
-    s: Length,
+    pub s: Length,
     /// t-coordinate
-    t: Length,
+    pub t: Length,
     /// Validity of the object along s-axis (0.0 for point object)
-    valid_length: Option<Length>,
+    pub valid_length: Option<Length>,
     /// z offset relative to the elevation of the reference line
-    z_offset: Option<Length>,
-    validity: Vec<LaneValidity>,
+    pub z_offset: Option<Length>,
+    pub validity: Vec<LaneValidity>,
 }
 
 impl ObjectReference {
