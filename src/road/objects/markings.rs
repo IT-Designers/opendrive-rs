@@ -109,7 +109,7 @@ impl Marking {
             "stopOffset" => Some(self.stop_offset.value.to_scientific_string()).as_deref(),
             "weight" => self.weight.as_ref().map(RoadMarkWeight::as_str),
             "width" => self.width.map(|v| v.value.to_scientific_string()).as_deref(),
-            "z_offset" => self.z_offset.map(|v| v.value.to_scientific_string()).as_deref(),
+            "zOffset" => self.z_offset.map(|v| v.value.to_scientific_string()).as_deref(),
         )
     }
 
