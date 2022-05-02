@@ -5,7 +5,6 @@ use vec1::Vec1;
 /// Each `<station>` element must contain at least one `<platform>` element. Each `<platform>`
 /// element must contain at least one reference to a valid track segment.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Platform {
     pub segment: Vec1<Segment>,
     /// Unique ID within database
@@ -57,6 +56,21 @@ where
             segment: Vec1::try_from_vec(segment).unwrap(),
             id: read.attribute("id")?,
             name: read.attribute_opt("name")?,
+        })
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Platform {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            segment: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+            id: u.arbitrary()?,
+            name: u.arbitrary()?,
         })
     }
 }

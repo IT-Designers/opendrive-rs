@@ -5,7 +5,6 @@ use vec1::Vec1;
 /// Defines stations for tram and railroad applications and for automotive environments. May refer
 /// to multiple tracks and is therefore defined on the same level as junctions.
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Station {
     pub platform: Vec1<Platform>,
     /// Unique ID within database
@@ -62,6 +61,22 @@ where
             id: read.attribute("id")?,
             name: read.attribute("name")?,
             r#type: read.attribute_opt("type")?,
+        })
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Station {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        Ok(Self {
+            platform: {
+                let mut vec1 = Vec1::new(u.arbitrary()?);
+                vec1.extend(u.arbitrary::<Vec<_>>()?);
+                vec1
+            },
+            id: u.arbitrary()?,
+            name: u.arbitrary()?,
+            r#type: u.arbitrary()?,
         })
     }
 }

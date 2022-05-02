@@ -187,6 +187,7 @@ impl arbitrary::Arbitrary<'_> for Road {
             name: u.arbitrary()?,
             rule: u.arbitrary()?,
             link: u.arbitrary()?,
+            r#type: u.arbitrary()?,
             plan_view: u.arbitrary()?,
             elevation_profile: u.arbitrary()?,
             lateral_profile: u.arbitrary()?,
