@@ -221,8 +221,8 @@ where
 {
     type Error = crate::parser::Error;
 
-    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        Ok(Self {
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        read.expecting_no_child_elements_for(Self {
             dz: read.attribute("dz").map(Length::new::<meter>)?,
             height: read.attribute("height").map(Length::new::<meter>)?,
             id: read.attribute_opt("id")?,
@@ -295,8 +295,8 @@ where
 {
     type Error = crate::parser::Error;
 
-    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        Ok(Self {
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        read.expecting_no_child_elements_for(Self {
             height: read.attribute("height").map(Length::new::<meter>)?,
             id: read.attribute_opt("id")?,
             u: read.attribute("u").map(Length::new::<meter>)?,

@@ -47,8 +47,8 @@ where
 {
     type Error = crate::parser::Error;
 
-    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        Ok(Self {
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        read.expecting_no_child_elements_for(Self {
             road_id: read.attribute("roadId")?,
             s_end: read.attribute("sEnd").map(Length::new::<meter>)?,
             side: read.attribute("side")?,

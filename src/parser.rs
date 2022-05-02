@@ -172,6 +172,23 @@ where
         }
         Ok(())
     }
+
+    #[inline]
+    pub fn expecting_no_child_elements(&mut self) -> Result<(), Error> {
+        self.children(|name, mut read| {
+            dbg!(name);
+            read.expecting_no_child_elements()
+        })
+    }
+
+    #[inline]
+    pub fn expecting_no_child_elements_for<T>(&mut self, value: T) -> Result<T, Error> {
+        self.children(|_name, mut read| {
+            dbg!(read.path().to_string());
+            read.expecting_no_child_elements()
+        })?;
+        Ok(value)
+    }
 }
 
 impl<'a, I> Drop for ReadContext<'a, I>
@@ -180,8 +197,8 @@ where
 {
     fn drop(&mut self) {
         if !self.children_done {
+            dbg!(self.path().to_string());
             let _ = self.children(|name, ctx| {
-                dbg!(name);
                 // walk it by dropping it
                 let _ = (name, ctx);
                 Ok(())

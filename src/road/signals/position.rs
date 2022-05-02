@@ -63,8 +63,8 @@ where
 {
     type Error = crate::parser::Error;
 
-    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        Ok(Self {
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        read.expecting_no_child_elements_for(Self {
             hdg: Angle::new::<radian>(read.attribute("hdg")?),
             pitch: read.attribute_opt("pitch")?.map(Angle::new::<radian>),
             roll: read.attribute_opt("roll")?.map(Angle::new::<radian>),
