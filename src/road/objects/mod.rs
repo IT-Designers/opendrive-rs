@@ -227,6 +227,10 @@ impl Object {
             visit_children!(visitor, "markings" => markings);
         }
 
+        if let Some(borders) = &self.borders {
+            visit_children!(visitor, "borders" => borders);
+        }
+
         if let Some(surface) = &self.surface {
             visit_children!(visitor, "surface" => surface);
         }
@@ -367,6 +371,7 @@ impl arbitrary::Arbitrary<'_> for Object {
             validity: u.arbitrary()?,
             parking_space: u.arbitrary()?,
             markings: u.arbitrary()?,
+            borders: u.arbitrary()?,
             surface: u.arbitrary()?,
         })
     }
