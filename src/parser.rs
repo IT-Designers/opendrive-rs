@@ -161,9 +161,14 @@ where
                         return Err(e);
                     }
                 }
-                #[cfg_attr(debug_assertions, allow(unused))]
                 xml::reader::XmlEvent::EndElement { name } => {
                     debug_assert_eq!(self.element_name(), &name.local_name);
+                    self.children_done = true;
+                    break;
+                }
+                xml::reader::XmlEvent::EndDocument => {
+                    debug_assert!(self.path.parent.is_none());
+                    debug_assert!(self.path.name.is_empty());
                     self.children_done = true;
                     break;
                 }
