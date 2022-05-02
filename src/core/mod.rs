@@ -359,8 +359,8 @@ where
 {
     type Error = crate::parser::Error;
 
-    fn try_from(_read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        Ok(Self {})
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        read.expecting_no_child_elements_for(Self {})
     }
 }
 
@@ -412,8 +412,8 @@ where
 {
     type Error = crate::parser::Error;
 
-    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        Ok(Self {
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        read.expecting_no_child_elements_for(Self {
             hdg: read.attribute("hdg").map(Angle::new::<radian>)?,
             x: read.attribute("x").map(Length::new::<meter>)?,
             y: read.attribute("y").map(Length::new::<meter>)?,

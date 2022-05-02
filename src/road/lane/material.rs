@@ -48,8 +48,8 @@ where
 {
     type Error = crate::parser::Error;
 
-    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        Ok(Self {
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        read.expecting_no_child_elements_for(Self {
             friction: read.attribute("friction")?,
             roughness: read.attribute_opt("roughness")?,
             s_offset: read.attribute("sOffset").map(Length::new::<meter>)?,

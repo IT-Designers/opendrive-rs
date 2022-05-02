@@ -154,8 +154,8 @@ where
 {
     type Error = crate::parser::Error;
 
-    fn try_from(read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        Ok(Self {
+    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
+        read.expecting_no_child_elements_for(Self {
             h_offset: Angle::new::<radian>(read.attribute("hOffset")?),
             pitch: read.attribute_opt("pitch")?.map(Angle::new::<radian>),
             road_id: read.attribute("roadId")?,
