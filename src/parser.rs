@@ -121,7 +121,6 @@ where
                     }
                     context.elements(&mut [])?;
                 }
-                #[cfg_attr(debug_assertions, allow(unused))]
                 xml::reader::XmlEvent::EndElement { name } => {
                     debug_assert_eq!(self.element_name(), &name.local_name);
                     self.children_done = true;
@@ -462,48 +461,48 @@ macro_rules! find_map_parse_elem {
 #[macro_export]
 macro_rules! match_child_eq_ignore_ascii_case {
     ($context:ident, $($name:literal $($req:literal)? => $ty:ty => $consumer:expr,)* $(_ => $alt:expr)? $(,)?) => {
-        let mut __fields = [
-            true,
-            $(
-                {
+        $(
+            paste::paste!{
+                #[allow(non_snake_case)]
+                let mut [<__is_missing_ $name>] = {
                     #[allow(unused_mut, unused_assignments)]
                     let mut r = false;
                     $(r = $req;)?
                     r
-                },
-            )*
-        ];
+                };
+            }
+        )*
 
         $context.children(|name, context| {
-            let mut __index = 1;
-            $(
-                if $name.eq_ignore_ascii_case(name) {
-                    let v = <$ty as TryFrom<_>>::try_from(context)?;
-                    let _ = $consumer(v);
-                    __fields[__index] = false;
-                    return Ok(());
+            paste::paste!{
+                match name {
+                    $(
+                        _ if $name.eq_ignore_ascii_case(name) => {
+                            let v = <$ty as TryFrom<_>>::try_from(context)?;
+                            #[allow(redundant_closure_call)]
+                            let _ = ($consumer)(v);
+                            [<__is_missing_ $name>] = false;
+                            Ok(())
+                        },
+                    )*
+                    _ => Ok(()),
                 }
-                __index += 1;
-            )*
-            Ok(())
+            }
         })?;
 
-
-        let mut __index = 1;
         $(
-            let _ = $name;
-            if __fields[__index] {
-                $(
-                    let _: bool = $req;
+            paste::paste!{
+                if [<__is_missing_ $name>] {
+                    $(let _: bool = $req;)?
                     return Err($crate::parser::Error::missing_element(
                         $context.path().to_string(),
                         $name,
                         stringify!($ty),
                     ));
-                )?
+                };
             }
-            __index += 1;
         )*
+
     }
 }
 
