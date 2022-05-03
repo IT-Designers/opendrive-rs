@@ -1,5 +1,6 @@
-use crate::road::objects::validity::LaneValidity;
-use crate::road::objects::Orientation;
+use crate::core::additional_data::AdditionalData;
+use crate::object::lane_validity::LaneValidity;
+use crate::object::orientation::Orientation;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
@@ -25,6 +26,7 @@ pub struct ObjectReference {
     /// z offset relative to the elevation of the reference line
     pub z_offset: Option<Length>,
     pub validity: Vec<LaneValidity>,
+    pub additional_data: AdditionalData,
 }
 
 impl ObjectReference {
@@ -52,7 +54,8 @@ impl ObjectReference {
         for validity in &self.validity {
             visit_children!(visitor, "validity" => validity);
         }
-        Ok(())
+
+        self.additional_data.append_children(visitor)
     }
 }
 
@@ -64,10 +67,12 @@ where
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut validity = Vec::new();
+        let mut additional_data = AdditionalData::default();
 
         match_child_eq_ignore_ascii_case!(
             read,
             "validity" => LaneValidity => |v| validity.push(v),
+            _ => |_name, context| additional_data.fill(context),
         );
 
         Ok(Self {
@@ -78,6 +83,7 @@ where
             valid_length: read.attribute_opt("validLength")?.map(Length::new::<meter>),
             z_offset: read.attribute_opt("zOffset")?.map(Length::new::<meter>),
             validity,
+            additional_data,
         })
     }
 }
@@ -102,6 +108,7 @@ impl arbitrary::Arbitrary<'_> for ObjectReference {
                 .transpose()?
                 .map(Length::new::<meter>),
             validity: u.arbitrary()?,
+            additional_data: u.arbitrary()?,
         })
     }
 }

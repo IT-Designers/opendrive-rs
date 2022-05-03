@@ -1,5 +1,5 @@
-use crate::road::objects::validity::LaneValidity;
-use crate::road::objects::Orientation;
+use crate::object::lane_validity::LaneValidity;
+use crate::object::orientation::Orientation;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;

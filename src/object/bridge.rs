@@ -1,31 +1,27 @@
-use crate::road::objects::validity::LaneValidity;
+use crate::core::additional_data::AdditionalData;
+use crate::object::bridge_type::BridgeType;
+use crate::object::lane_validity::LaneValidity;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 
-/// Tunnels are modeled as objects in ASAM OpenDRIVE. Tunnels apply to the entire cross section of
-/// the road within the given range unless a lane validity element with further restrictions is
-/// provided as child element.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Tunnel {
-    /// Degree of daylight intruding the tunnel. Depends on the application.
-    pub daylight: Option<f64>,
+pub struct Bridge {
     /// Unique ID within database
     pub id: String,
-    /// Length of the tunnel (in s-direction)
+    /// Length of the bridge (in s-direction)
     pub length: Length,
-    /// Degree of artificial tunnel lighting. Depends on the application.
-    pub lighting: Option<f64>,
-    /// Name of the tunnel. May be chosen freely.
+    /// Name of the bridge. May be chosen freely.
     pub name: Option<String>,
     /// s-coordinate
     pub s: Length,
-    /// Type of tunnel
-    pub r#type: TunnelType,
+    /// Type of bridge
+    pub r#type: BridgeType,
     pub validity: Vec<LaneValidity>,
+    pub additional_data: AdditionalData,
 }
 
-impl Tunnel {
+impl Bridge {
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
@@ -34,10 +30,8 @@ impl Tunnel {
     ) -> xml::writer::Result<()> {
         visit_attributes_flatten!(
             visitor,
-            "daylight" => self.daylight.map(|v| v.to_scientific_string()).as_deref(),
             "id" => Some(self.id.as_str()),
             "length" => Some(self.length.value.to_scientific_string()).as_deref(),
-            "lighting" => self.lighting.map(|v| v.to_scientific_string()).as_deref(),
             "name" => self.name.as_deref(),
             "s" => Some(self.s.value.to_scientific_string()).as_deref(),
             "type" => Some(self.r#type.as_str()),
@@ -51,11 +45,12 @@ impl Tunnel {
         for validity in &self.validity {
             visit_children!(visitor, "validity" => validity);
         }
-        Ok(())
+
+        self.additional_data.append_children(visitor)
     }
 }
 
-impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Tunnel
+impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Bridge
 where
     I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
 {
@@ -63,58 +58,38 @@ where
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut validity = Vec::new();
+        let mut additional_data = AdditionalData::default();
 
         match_child_eq_ignore_ascii_case!(
             read,
             "validity" => LaneValidity => |v| validity.push(v),
+            _ => |_name, context| additional_data.fill(context),
         );
 
         Ok(Self {
-            daylight: read.attribute_opt("daylight")?,
             id: read.attribute("id")?,
             length: read.attribute("length").map(Length::new::<meter>)?,
-            lighting: read.attribute_opt("lighting")?,
             name: read.attribute_opt("name")?,
             s: read.attribute("s").map(Length::new::<meter>)?,
             r#type: read.attribute("type")?,
             validity,
+            additional_data,
         })
     }
 }
 
 #[cfg(feature = "fuzzing")]
-impl arbitrary::Arbitrary<'_> for Tunnel {
+impl arbitrary::Arbitrary<'_> for Bridge {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         use crate::fuzzing::NotNan;
         Ok(Self {
-            daylight: u
-                .arbitrary::<Option<()>>()?
-                .map(|_| u.not_nan_f64())
-                .transpose()?,
             id: u.arbitrary()?,
             length: Length::new::<meter>(u.not_nan_f64()?),
-            lighting: u
-                .arbitrary::<Option<()>>()?
-                .map(|_| u.not_nan_f64())
-                .transpose()?,
             name: u.arbitrary()?,
             s: Length::new::<meter>(u.not_nan_f64()?),
             r#type: u.arbitrary()?,
             validity: u.arbitrary()?,
+            additional_data: u.arbitrary()?,
         })
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum TunnelType {
-    Standard,
-    /// i.e. sides are open for daylight
-    Underpass,
-}
-
-impl_from_str_as_str!(
-    TunnelType,
-    "standard" => Standard,
-    "underpass" => Underpass,
-);

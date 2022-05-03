@@ -1,6 +1,6 @@
+use crate::object::lane_validity::LaneValidity;
+use crate::object::orientation::Orientation;
 use crate::road::country_code::CountryCode;
-use crate::road::objects::validity::LaneValidity;
-use crate::road::objects::Orientation;
 use crate::road::signals::dependency::Dependency;
 use crate::road::signals::position::PositionChoice;
 use crate::road::signals::position::PositionInertial;

@@ -1,71 +1,11 @@
+use crate::core::additional_data::AdditionalData;
 use crate::lane::road_mark::weight::Weight;
-use crate::road::objects::borders::CornerReference;
-use crate::road::objects::road_mark_color::RoadMarkColor;
-use crate::road::objects::side_type::SideType;
+use crate::object::corner_reference::CornerReference;
+use crate::object::road_mark_color::RoadMarkColor;
+use crate::object::side_type::SideType;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
-use vec1::Vec1;
-
-/// Describes the appearance of the parking space with multiple marking elements.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Markings {
-    pub marking: Vec1<Marking>,
-}
-
-impl Markings {
-    pub fn visit_attributes(
-        &self,
-        visitor: impl for<'b> FnOnce(
-            Cow<'b, [xml::attribute::Attribute<'b>]>,
-        ) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        visit_attributes!(visitor)
-    }
-
-    pub fn visit_children(
-        &self,
-        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        for marking in &self.marking {
-            visit_children!(visitor, "marking" => marking);
-        }
-        Ok(())
-    }
-}
-
-impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Markings
-where
-    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
-{
-    type Error = crate::parser::Error;
-
-    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        let mut marking = Vec::new();
-
-        match_child_eq_ignore_ascii_case!(
-            read,
-            "marking" true => Marking => |v| marking.push(v),
-        );
-
-        Ok(Self {
-            marking: Vec1::try_from_vec(marking).unwrap(),
-        })
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl arbitrary::Arbitrary<'_> for Markings {
-    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
-        Ok(Self {
-            marking: {
-                let mut vec1 = Vec1::new(u.arbitrary()?);
-                vec1.extend(u.arbitrary::<Vec<_>>()?);
-                vec1
-            },
-        })
-    }
-}
 
 /// Specifies a marking that is either attached to one side of the object bounding box or
 /// referencing outline points.
@@ -90,6 +30,7 @@ pub struct Marking {
     pub width: Option<Length>,
     /// Height of road mark above the road, i.e. thickness of the road mark
     pub z_offset: Option<Length>,
+    pub additional_data: AdditionalData,
 }
 
 impl Marking {
@@ -120,7 +61,8 @@ impl Marking {
         for corner_reference in &self.corner_reference {
             visit_children!(visitor, "cornerReference" => corner_reference);
         }
-        Ok(())
+
+        self.additional_data.append_children(visitor)
     }
 }
 
@@ -132,10 +74,12 @@ where
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut corner_reference = Vec::new();
+        let mut additional_data = AdditionalData::default();
 
         match_child_eq_ignore_ascii_case!(
             read,
             "cornerReference" => CornerReference => |v| corner_reference.push(v),
+            _ => |_name, context| additional_data.fill(context),
         );
 
         Ok(Self {
@@ -149,6 +93,7 @@ where
             weight: read.attribute_opt("weight")?,
             width: read.attribute_opt("width")?.map(Length::new::<meter>),
             z_offset: read.attribute_opt("zOffset")?.map(Length::new::<meter>),
+            additional_data,
         })
     }
 }
@@ -157,6 +102,8 @@ where
 impl arbitrary::Arbitrary<'_> for Marking {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         use crate::fuzzing::NotNan;
+        use uom::si::f64::Length;
+        use uom::si::length::meter;
         Ok(Self {
             corner_reference: u.arbitrary()?,
             color: u.arbitrary()?,
@@ -176,6 +123,7 @@ impl arbitrary::Arbitrary<'_> for Marking {
                 .map(|_| u.not_nan_f64())
                 .transpose()?
                 .map(Length::new::<meter>),
+            additional_data: u.arbitrary()?,
         })
     }
 }

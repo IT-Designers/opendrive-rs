@@ -1,50 +1,5 @@
 use std::borrow::Cow;
 
-/// Used to describe the road surface elevation of an object.
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub struct Surface {
-    pub crg: Option<Crg>,
-}
-
-impl Surface {
-    pub fn visit_attributes(
-        &self,
-        visitor: impl for<'b> FnOnce(
-            Cow<'b, [xml::attribute::Attribute<'b>]>,
-        ) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        visit_attributes!(visitor)
-    }
-
-    pub fn visit_children(
-        &self,
-        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        if let Some(crg) = &self.crg {
-            visit_children!(visitor, "CRG" => crg);
-        }
-        Ok(())
-    }
-}
-impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Surface
-where
-    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
-{
-    type Error = crate::parser::Error;
-
-    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        let mut crg = None;
-
-        match_child_eq_ignore_ascii_case!(
-            read,
-            "CRG" => Crg => |v| crg = Some(v),,
-        );
-
-        Ok(Self { crg })
-    }
-}
-
 /// Elevation data described in {GLO_VAR_STA_ASAM_OpenCRG} are represented by the `<CRG>` element
 /// within the `<surface>` element.
 #[derive(Debug, Clone, PartialEq)]

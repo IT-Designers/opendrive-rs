@@ -1,105 +1,48 @@
-use crate::road::objects::bridge::Bridge;
-use crate::road::objects::markings::Markings;
-use crate::road::objects::material::Material;
-use crate::road::objects::outline::{Outline, Outlines};
-use crate::road::objects::parking::ParkingSpace;
-use crate::road::objects::reference::ObjectReference;
-use crate::road::objects::repeat::Repeat;
-use crate::road::objects::surface::Surface;
-use crate::road::objects::tunnel::Tunnel;
-use crate::road::objects::validity::LaneValidity;
+use crate::core::additional_data::AdditionalData;
+use crate::object::borders::Borders;
+use crate::object::lane_validity::LaneValidity;
+use crate::object::markings::Markings;
+use crate::object::material::Material;
+use crate::object::orientation::{ObjectType, Orientation};
+use crate::object::outline::Outline;
+use crate::object::parking_space::ParkingSpace;
+use crate::object::repeat::Repeat;
+use crate::object::surface::Surface;
+use outlines::Outlines;
 use std::borrow::Cow;
 use uom::si::angle::radian;
 use uom::si::f64::Angle;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 
+pub mod access;
+pub mod border;
+pub mod border_type;
 pub mod borders;
 pub mod bridge;
+pub mod bridge_type;
+pub mod corner;
+pub mod corner_local;
+pub mod corner_reference;
+pub mod corner_road;
+pub mod crg;
+pub mod lane_validity;
+pub mod marking;
 pub mod markings;
 pub mod material;
+pub mod objects;
+pub mod orientation;
 pub mod outline;
-pub mod parking;
+pub mod outline_fill_type;
+pub mod outlines;
+pub mod parking_space;
 pub mod reference;
 pub mod repeat;
 pub mod road_mark_color;
 pub mod side_type;
 pub mod surface;
 pub mod tunnel;
-pub mod validity;
-
-/// Container for all objects along a road
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub struct Objects {
-    pub object: Vec<Object>,
-    pub object_reference: Vec<ObjectReference>,
-    pub tunnel: Vec<Tunnel>,
-    pub bridge: Vec<Bridge>,
-}
-
-impl Objects {
-    pub fn visit_attributes(
-        &self,
-        visitor: impl for<'b> FnOnce(
-            Cow<'b, [xml::attribute::Attribute<'b>]>,
-        ) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        visit_attributes!(visitor)
-    }
-
-    pub fn visit_children(
-        &self,
-        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        for object in &self.object {
-            visit_children!(visitor, "object" => object);
-        }
-
-        for object_reference in &self.object_reference {
-            visit_children!(visitor, "objectReference" => object_reference);
-        }
-
-        for tunnel in &self.tunnel {
-            visit_children!(visitor, "tunnel" => tunnel);
-        }
-
-        for bridge in &self.bridge {
-            visit_children!(visitor, "bridge" => bridge);
-        }
-
-        Ok(())
-    }
-}
-
-impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Objects
-where
-    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
-{
-    type Error = crate::parser::Error;
-
-    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        let mut object = Vec::new();
-        let mut object_reference = Vec::new();
-        let mut tunnel = Vec::new();
-        let mut bridge = Vec::new();
-
-        match_child_eq_ignore_ascii_case!(
-            read,
-            "object" => Object => |v| object.push(v),
-            "objectReference" => ObjectReference => |v| object_reference.push(v),
-            "tunnel" => Tunnel => |v| tunnel.push(v),
-            "bridge" => Bridge => |v| bridge.push(v),
-        );
-
-        Ok(Self {
-            object,
-            object_reference,
-            tunnel,
-            bridge,
-        })
-    }
-}
+pub mod tunnel_type;
 
 /// Describes common 3D objects that have a reference to a given road. Objects are items that
 /// influence a road by expanding, delimiting, and supplementing its course. The most common
@@ -163,6 +106,7 @@ pub struct Object {
     pub markings: Option<Markings>,
     pub borders: Option<Borders>,
     pub surface: Option<Surface>,
+    pub additional_data: AdditionalData,
 }
 
 impl Object {
@@ -235,7 +179,7 @@ impl Object {
             visit_children!(visitor, "surface" => surface);
         }
 
-        Ok(())
+        self.additional_data.append_children(visitor)
     }
 }
 
@@ -255,6 +199,7 @@ where
         let mut markings = None;
         let mut borders = None;
         let mut surface = None;
+        let mut additional_data = AdditionalData::default();
 
         match_child_eq_ignore_ascii_case!(
             read,
@@ -267,6 +212,7 @@ where
             "markings" => Markings => |v| markings = Some(v),
             "borders" => Borders => |v| borders = Some(v),
             "surface" => Surface => |v| surface = Some(v),
+            _ => |_name, context| additional_data.fill(context),
         );
 
         Ok(Self {
@@ -305,6 +251,7 @@ where
             markings,
             borders,
             surface,
+            additional_data,
         })
     }
 }
@@ -373,100 +320,7 @@ impl arbitrary::Arbitrary<'_> for Object {
             markings: u.arbitrary()?,
             borders: u.arbitrary()?,
             surface: u.arbitrary()?,
+            additional_data: u.arbitrary()?,
         })
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum Orientation {
-    Plus,
-    Minus,
-    None,
-}
-
-impl_from_str_as_str!(
-    Orientation,
-    "+" => Plus,
-    "-" => Minus,
-    "none" => None,
-);
-
-use crate::road::objects::borders::Borders;
-pub use allow_deprecated::ObjectType;
-
-#[allow(deprecated)]
-mod allow_deprecated {
-    #[derive(Debug, Clone, PartialEq)]
-    #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-    pub enum ObjectType {
-        /// i.e. unknown
-        None,
-        /// for anything that is not further categorized
-        Obstacle,
-        #[deprecated]
-        Car,
-        Pole,
-        Tree,
-        Vegetation,
-        Barrier,
-        Building,
-        ParkingSpace,
-        Patch,
-        Railing,
-        TrafficIsland,
-        Crosswalk,
-        StreetLamp,
-        Gantry,
-        SoundBarrier,
-        #[deprecated]
-        Van,
-        #[deprecated]
-        Bus,
-        #[deprecated]
-        Trailer,
-        #[deprecated]
-        Bike,
-        #[deprecated]
-        Motorbike,
-        #[deprecated]
-        Tram,
-        #[deprecated]
-        Train,
-        #[deprecated]
-        Pedestrian,
-        #[deprecated]
-        Wind,
-        RoadMark,
-    }
-
-    impl_from_str_as_str!(
-        ObjectType,
-        "none" => None,
-        "obstacle" => Obstacle,
-        "car" => Car,
-        "pole" => Pole,
-        "tree" => Tree,
-        "vegetation" => Vegetation,
-        "barrier" => Barrier,
-        "building" => Building,
-        "parkingSpace" => ParkingSpace,
-        "patch" => Patch,
-        "railing" => Railing,
-        "trafficIsland" => TrafficIsland,
-        "crosswalk" => Crosswalk,
-        "streetLamp" => StreetLamp,
-        "gantry" => Gantry,
-        "soundBarrier" => SoundBarrier,
-        "van" => Van,
-        "bus" => Bus,
-        "trailer" => Trailer,
-        "bike" => Bike,
-        "motorbike" => Motorbike,
-        "tram" => Tram,
-        "train" => Train,
-        "pedestrian" => Pedestrian,
-        "wind" => Wind,
-        "roadMark" => RoadMark,
-    );
 }

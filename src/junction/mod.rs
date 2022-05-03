@@ -3,7 +3,7 @@ use crate::junction::connection::Connection;
 use crate::junction::controller::Controller;
 use crate::junction::priority::Priority;
 use crate::junction::surface::Surface;
-use crate::road::objects::Orientation;
+use crate::object::orientation::Orientation;
 use junction_type::JunctionType;
 use std::borrow::Cow;
 use uom::si::f64::Length;
