@@ -43,31 +43,18 @@ impl core::str::FromStr for CountryCode {
 #[cfg(feature = "fuzzing")]
 impl arbitrary::Arbitrary<'_> for CountryCode {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::ArbitraryStrings;
         if u.arbitrary()? {
             Ok(Self::CountryCodeDeprecated(u.arbitrary()?))
         } else if u.arbitrary()? {
-            Ok(Self::Iso3166alpha2({
-                let mut string = String::with_capacity(2);
-                while string.len() < 2 {
-                    let c = char::from(u.int_in_range('A' as u8..='Z' as u8)?);
-                    if c.is_ascii_alphabetic() {
-                        string.push(c);
-                    }
-                }
-                string
-            }))
+            Ok(Self::Iso3166alpha2(
+                u.arbitrary_string(2..=2, &['A'..='Z'])?,
+            ))
         } else {
             #[allow(deprecated)]
-            Ok(Self::Iso3166alpha3({
-                let mut string = String::with_capacity(3);
-                while string.len() < 3 {
-                    let c = char::from(u.int_in_range('A' as u8..='Z' as u8)?);
-                    if c.is_ascii_alphabetic() {
-                        string.push(c);
-                    }
-                }
-                string
-            }))
+            Ok(Self::Iso3166alpha3(
+                u.arbitrary_string(3..=3, &['A'..='Z'])?,
+            ))
         }
     }
 }
