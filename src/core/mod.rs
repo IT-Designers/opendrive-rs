@@ -39,15 +39,7 @@ impl OpenDrive {
         let mut events = reader.into_iter();
         let mut drive = None;
 
-        let mut read = crate::parser::ReadContext {
-            iterator: &mut events,
-            path: crate::parser::Path {
-                parent: None,
-                name: "",
-            },
-            attributes: Vec::new(),
-            children_done: false,
-        };
+        let mut read = crate::parser::ReadContext::from(&mut events);
 
         match_child_eq_ignore_ascii_case!(
             read,

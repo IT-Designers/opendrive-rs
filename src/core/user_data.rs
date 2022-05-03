@@ -115,8 +115,7 @@ where
         Ok(Self {
             name,
             attributes: read
-                .attributes
-                .iter()
+                .attributes()
                 .map(|a| (a.name.local_name.to_string(), a.value.clone()))
                 .collect(),
             children,

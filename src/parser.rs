@@ -25,16 +25,38 @@ pub struct ReadContext<'a, I>
 where
     I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
 {
-    pub iterator: &'a mut I,
-    pub path: Path<'a>,
-    pub attributes: Vec<OwnedAttribute>,
-    pub children_done: bool,
+    iterator: &'a mut I,
+    path: Path<'a>,
+    attributes: Vec<OwnedAttribute>,
+    children_done: bool,
+    #[cfg(debug_assertions)]
+    read_attributes: std::cell::RefCell<Vec<String>>,
 }
 
 impl<'a, I> ReadContext<'a, I>
 where
     I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
 {
+    pub fn from_parent(
+        iterator: &'a mut I,
+        path: Path<'a>,
+        attributes: Vec<OwnedAttribute>,
+    ) -> Self {
+        Self::from(iterator)
+            .with_path(path)
+            .with_attributes(attributes)
+    }
+
+    pub fn with_path(mut self, path: Path<'a>) -> Self {
+        self.path = path;
+        self
+    }
+
+    pub fn with_attributes(mut self, attributes: Vec<OwnedAttribute>) -> Self {
+        self.attributes = attributes;
+        self
+    }
+
     pub fn path(&self) -> Path {
         self.path
     }
@@ -47,6 +69,8 @@ where
     where
         T::Err: Into<ParseError>,
     {
+        #[cfg(debug_assertions)]
+        self.read_attributes.borrow_mut().push(name.to_string());
         for attribute in &self.attributes {
             if attribute.name.local_name.eq_ignore_ascii_case(name) {
                 return match T::from_str(&attribute.value) {
@@ -72,6 +96,8 @@ where
     where
         T::Err: Into<ParseError>,
     {
+        #[cfg(debug_assertions)]
+        self.read_attributes.borrow_mut().push(name.to_string());
         for attribute in &self.attributes {
             if attribute.name.local_name.eq_ignore_ascii_case(name) {
                 return match T::from_str(&attribute.value) {
@@ -89,6 +115,16 @@ where
         Ok(None)
     }
 
+    pub fn attributes(&self) -> impl Iterator<Item = &OwnedAttribute> {
+        self.attributes.iter().map(|a| {
+            #[cfg(debug_assertions)]
+            self.read_attributes
+                .borrow_mut()
+                .push(a.name.local_name.clone());
+            a
+        })
+    }
+
     #[allow(clippy::type_complexity)] // for now, getting removed later on most properly anyway...
     pub fn elements(
         &mut self,
@@ -104,15 +140,14 @@ where
                     attributes,
                     namespace: _,
                 } => {
-                    let mut context = ReadContext {
-                        iterator: &mut *self.iterator,
-                        path: Path {
+                    let mut context = ReadContext::from_parent(
+                        &mut *self.iterator,
+                        Path {
                             parent: Some(&self.path),
                             name: &name.local_name,
                         },
                         attributes,
-                        children_done: false,
-                    };
+                    );
                     for (mapper_name, mapper_fn) in mapper.iter_mut() {
                         if name.local_name.eq_ignore_ascii_case(mapper_name) {
                             mapper_fn(&mut context)?;
@@ -145,15 +180,14 @@ where
                 } => {
                     if let Err(e) = mapper(
                         &name.local_name,
-                        ReadContext {
-                            iterator: &mut *self.iterator,
-                            path: Path {
+                        ReadContext::from_parent(
+                            &mut *self.iterator,
+                            Path {
                                 parent: Some(&self.path),
                                 name: &name.local_name,
                             },
                             attributes,
-                            children_done: false,
-                        },
+                        ),
                     ) {
                         // dont walk any more elements on an error, just drop them
                         self.children_done = true;
@@ -195,6 +229,25 @@ where
     }
 }
 
+impl<'a, I> From<&'a mut I> for ReadContext<'a, I>
+where
+    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
+{
+    fn from(iterator: &'a mut I) -> Self {
+        Self {
+            iterator,
+            path: Path {
+                parent: None,
+                name: "",
+            },
+            attributes: Vec::new(),
+            children_done: false,
+            #[cfg(debug_assertions)]
+            read_attributes: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+}
+
 impl<'a, I> Drop for ReadContext<'a, I>
 where
     I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
@@ -207,6 +260,17 @@ where
                 let _ = (name, ctx);
                 Ok(())
             });
+        }
+        if cfg!(debug_assertions) {
+            let attributes = self
+                .attributes
+                .iter()
+                .filter(|a| !self.read_attributes.borrow().contains(&a.name.local_name))
+                .collect::<Vec<_>>();
+            if !attributes.is_empty() {
+                dbg!(self.path().to_string());
+                dbg!(attributes);
+            }
         }
     }
 }

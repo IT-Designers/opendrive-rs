@@ -97,7 +97,7 @@ where
             y: read.attribute("y").map(Length::new::<meter>)?,
             choice: choice.ok_or_else(|| {
                 crate::parser::Error::missing_element(
-                    read.path.to_string(),
+                    read.path().to_string(),
                     "line|spiral|arc|poly3|paramPoly3",
                     core::any::type_name::<GeometryType>(),
                 )
