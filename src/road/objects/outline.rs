@@ -1,4 +1,4 @@
-use crate::road::lane::LaneType;
+use crate::lane::lane_type::LaneType;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;

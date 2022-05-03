@@ -1,4 +1,4 @@
-use crate::road::lane::road_mark_weight::RoadMarkWeight;
+use crate::lane::road_mark::weight::Weight;
 use crate::road::objects::borders::CornerReference;
 use crate::road::objects::road_mark_color::RoadMarkColor;
 use crate::road::objects::side_type::SideType;
@@ -85,7 +85,7 @@ pub struct Marking {
     /// Lateral offset in u-direction from end of bounding box side where the marking ends
     pub stop_offset: Length,
     /// Optical "weight" of the marking
-    pub weight: Option<RoadMarkWeight>,
+    pub weight: Option<Weight>,
     /// Width of the marking
     pub width: Option<Length>,
     /// Height of road mark above the road, i.e. thickness of the road mark
@@ -107,7 +107,7 @@ impl Marking {
             "spaceLength" => Some(self.space_length.value.to_scientific_string()).as_deref(),
             "startOffset" => Some(self.start_offset.value.to_scientific_string()).as_deref(),
             "stopOffset" => Some(self.stop_offset.value.to_scientific_string()).as_deref(),
-            "weight" => self.weight.as_ref().map(RoadMarkWeight::as_str),
+            "weight" => self.weight.as_ref().map(Weight::as_str),
             "width" => self.width.map(|v| v.value.to_scientific_string()).as_deref(),
             "zOffset" => self.z_offset.map(|v| v.value.to_scientific_string()).as_deref(),
         )

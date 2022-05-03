@@ -1,8 +1,8 @@
 use crate::core::additional_data::AdditionalData;
 use crate::junction::contact_point::ContactPoint;
 use crate::junction::element_dir::ElementDir;
+use crate::lane::lanes::Lanes;
 use crate::road::geometry::PlanView;
-use crate::road::lane::Lanes;
 use crate::road::objects::surface::Surface;
 use crate::road::objects::Objects;
 use crate::road::profile::{ElevationProfile, LateralProfile};
@@ -16,7 +16,6 @@ use uom::si::length::meter;
 #[allow(deprecated)]
 pub mod country_code;
 pub mod geometry;
-pub mod lane;
 pub mod objects;
 pub mod profile;
 pub mod railroad;

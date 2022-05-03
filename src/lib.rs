@@ -3,6 +3,7 @@ pub mod parser;
 
 pub mod core;
 pub mod junction;
+pub mod lane;
 pub mod road;
 
 #[cfg(feature = "fuzzing")]

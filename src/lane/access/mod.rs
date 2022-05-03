@@ -1,6 +1,11 @@
+use crate::lane::access::restriction_type::AccessRestrictionType;
+use rule::AccessRule;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
+
+pub mod restriction_type;
+pub mod rule;
 
 /// Defines access restrictions for certain types of road users.
 /// Each element is valid in direction of the increasing s coordinate until a new element is
@@ -8,7 +13,7 @@ use uom::si::length::meter;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Access {
     /// Identifier of the participant to whom the restriction applies
-    pub restriction: RestrictionType,
+    pub restriction: AccessRestrictionType,
     /// Specifies whether the participant given in the attribute @restriction is allowed or denied
     /// access to the given lane
     pub rule: Option<AccessRule>,
@@ -67,53 +72,3 @@ impl arbitrary::Arbitrary<'_> for Access {
         })
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum RestrictionType {
-    Simulator,
-    AutonomousTraffic,
-    Pedestrian,
-    PassengerCar,
-    Bus,
-    Delivery,
-    Emergency,
-    Taxi,
-    ThroughTraffic,
-    Truck,
-    Bicycle,
-    Motorcycle,
-    None,
-    Trucks,
-}
-
-impl_from_str_as_str!(
-    RestrictionType,
-    "simulator" => Simulator,
-    "autonomousTraffic" => AutonomousTraffic,
-    "pedestrian" => Pedestrian,
-    "passengerCar" => PassengerCar,
-    "bus" => Bus,
-    "delivery" => Delivery,
-    "emergency" => Emergency,
-    "taxi" => Taxi,
-    "throughTraffic" => ThroughTraffic,
-    "truck" => Truck,
-    "bicycle" => Bicycle,
-    "motorcycle" => Motorcycle,
-    "none" => None,
-    "trucks" => Trucks,
-);
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum AccessRule {
-    Allow,
-    Deny,
-}
-
-impl_from_str_as_str!(
-    AccessRule,
-    "allow" => Allow,
-    "deny" => Deny,
-);
