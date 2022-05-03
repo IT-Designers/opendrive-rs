@@ -1,4 +1,6 @@
-use crate::junction::{ContactPoint, ElementDir};
+use crate::core::additional_data::AdditionalData;
+use crate::junction::contact_point::ContactPoint;
+use crate::junction::element_dir::ElementDir;
 use crate::road::geometry::PlanView;
 use crate::road::lane::Lanes;
 use crate::road::objects::surface::Surface;
@@ -59,6 +61,7 @@ pub struct Road {
     pub signals: Option<Signals>,
     pub surface: Option<Surface>,
     pub railroad: Option<Railroad>,
+    pub additional_data: AdditionalData,
 }
 
 impl Road {
@@ -120,7 +123,7 @@ impl Road {
             "lanes" => self.lanes,
         );
 
-        Ok(())
+        self.additional_data.append_children(&mut visitor)
     }
 }
 
@@ -141,6 +144,7 @@ where
         let mut signals = None;
         let mut surface = None;
         let mut railroad = None;
+        let mut additional_data = AdditionalData::default();
 
         match_child_eq_ignore_ascii_case!(
             read,
@@ -154,6 +158,7 @@ where
             "signals" => Signals => |v| signals = Some(v),
             "surface" => Surface => |v| surface = Some(v),
             "railroad" => Railroad => |v| railroad = Some(v),
+            _ => |_name, context| additional_data.fill(context),
         );
 
         Ok(Self {
@@ -172,6 +177,7 @@ where
             signals,
             surface,
             railroad,
+            additional_data,
         })
     }
 }
@@ -196,6 +202,7 @@ impl arbitrary::Arbitrary<'_> for Road {
             signals: u.arbitrary()?,
             surface: u.arbitrary()?,
             railroad: u.arbitrary()?,
+            additional_data: u.arbitrary()?,
         })
     }
 }

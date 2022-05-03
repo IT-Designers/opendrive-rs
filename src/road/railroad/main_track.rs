@@ -1,4 +1,4 @@
-use crate::junction::ElementDir;
+use crate::junction::element_dir::ElementDir;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;

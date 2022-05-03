@@ -1,17 +1,29 @@
+use crate::core::additional_data::AdditionalData;
 use crate::junction::connection::Connection;
 use crate::junction::controller::Controller;
 use crate::junction::priority::Priority;
 use crate::junction::surface::Surface;
 use crate::road::objects::Orientation;
+use junction_type::JunctionType;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 use vec1::Vec1;
 
 pub mod connection;
+pub mod connection_type;
+pub mod contact_point;
 pub mod controller;
+pub mod crg;
+pub mod crg_mode;
+pub mod crg_purpose;
+pub mod element_dir;
 pub mod junction_group;
+pub mod junction_group_type;
 pub mod junction_reference;
+pub mod junction_type;
+pub mod lane_link;
+pub mod predecessor_successor;
 pub mod priority;
 pub mod surface;
 
@@ -45,6 +57,7 @@ pub struct Junction {
     /// for virtual junctions and direct junctions. If the attribute is not specified, the junction
     /// type is "default".
     pub r#type: Option<JunctionType>,
+    pub additional_data: AdditionalData,
 }
 
 impl Junction {
@@ -86,7 +99,7 @@ impl Junction {
             visit_children!(visitor, "surface" => surface);
         }
 
-        Ok(())
+        self.additional_data.append_children(visitor)
     }
 }
 
@@ -101,6 +114,7 @@ where
         let mut priority = Vec::new();
         let mut controller = Vec::new();
         let mut surface = None;
+        let mut additional_data = AdditionalData::default();
 
         match_child_eq_ignore_ascii_case!(
             read,
@@ -108,6 +122,7 @@ where
             "priority" => Priority => |v| priority.push(v),
             "controller" => Controller => |v| controller.push(v),
             "surface" => Surface => |v| surface = Some(v),
+            _ => |_name, context| additional_data.fill(context),
         );
 
         Ok(Self {
@@ -122,6 +137,7 @@ where
             s_end: read.attribute_opt("sEnd")?.map(Length::new::<meter>),
             s_start: read.attribute_opt("sStart")?.map(Length::new::<meter>),
             r#type: read.attribute_opt("type")?,
+            additional_data,
         })
     }
 }
@@ -154,47 +170,7 @@ impl arbitrary::Arbitrary<'_> for Junction {
                 .transpose()?
                 .map(Length::new::<meter>),
             r#type: u.arbitrary()?,
+            additional_data: u.arbitrary()?,
         })
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum JunctionType {
-    Default,
-    Virtual,
-    Direct,
-}
-
-impl_from_str_as_str!(
-    JunctionType,
-    "default" => Default,
-    "virtual" => Virtual,
-    "direct" => Direct,
-);
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum ContactPoint {
-    Start,
-    End,
-}
-
-impl_from_str_as_str!(
-    ContactPoint,
-    "start" => Start,
-    "end" => End,
-);
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum ElementDir {
-    Plus,
-    Minus,
-}
-
-impl_from_str_as_str!(
-    ElementDir,
-    "+" => Plus,
-    "-" => Minus,
-);

@@ -1,3 +1,5 @@
+use crate::core::additional_data::AdditionalData;
+use crate::junction::junction_group_type::JunctionGroupType;
 use crate::junction::junction_reference::JunctionReference;
 use std::borrow::Cow;
 use vec1::Vec1;
@@ -14,6 +16,7 @@ pub struct JunctionGroup {
     pub name: Option<String>,
     /// Type of junction group
     pub r#type: JunctionGroupType,
+    pub additional_data: AdditionalData,
 }
 
 impl JunctionGroup {
@@ -38,7 +41,8 @@ impl JunctionGroup {
         for junction_reference in &self.junction_reference {
             visit_children!(visitor, "junctionReference" => junction_reference);
         }
-        Ok(())
+
+        self.additional_data.append_children(visitor)
     }
 }
 
@@ -50,10 +54,12 @@ where
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut junction_reference = Vec::new();
+        let mut additional_data = AdditionalData::default();
 
         match_child_eq_ignore_ascii_case!(
             read,
             "junctionReference" true => JunctionReference => |v| junction_reference.push(v),
+            _ => |_name, context| additional_data.fill(context),
         );
 
         Ok(Self {
@@ -61,6 +67,7 @@ where
             id: read.attribute("id")?,
             name: read.attribute_opt("name")?,
             r#type: read.attribute("type")?,
+            additional_data,
         })
     }
 }
@@ -77,19 +84,7 @@ impl arbitrary::Arbitrary<'_> for JunctionGroup {
             id: u.arbitrary()?,
             name: u.arbitrary()?,
             r#type: u.arbitrary()?,
+            additional_data: u.arbitrary()?,
         })
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum JunctionGroupType {
-    Roundabout,
-    Unknown,
-}
-
-impl_from_str_as_str!(
-    JunctionGroupType,
-    "roundabout" => Roundabout,
-    "unknown" => Unknown
-);
