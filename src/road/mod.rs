@@ -1,24 +1,32 @@
 use crate::core::additional_data::AdditionalData;
-use crate::junction::contact_point::ContactPoint;
-use crate::junction::element_dir::ElementDir;
 use crate::lane::lanes::Lanes;
 use crate::object::objects::Objects;
-use crate::object::surface::Surface;
 use crate::railroad::Railroad;
-use crate::road::geometry::PlanView;
-use crate::road::profile::{ElevationProfile, LateralProfile};
-use crate::road::r#type::Type;
+use crate::road::profile::ElevationProfile;
+use crate::road::road_type::RoadType;
+use crate::road::surface::Surface;
 use crate::signal::Signals;
+use geometry::plan_view::PlanView;
+use link::Link;
+use profile::lateral_profile::LateralProfile;
+use rule::Rule;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
 
 #[allow(deprecated)]
 pub mod country_code;
+pub mod crg;
+pub mod element_type;
 pub mod geometry;
+pub mod link;
+pub mod predecessor_successor;
 pub mod profile;
+pub mod road_type;
+pub mod road_type_e;
+pub mod rule;
 pub mod speed;
-pub mod r#type;
+pub mod surface;
 pub mod unit;
 
 /// In ASAM OpenDRIVE, the road network is represented by `<road>` elements. Each road runs along
@@ -48,7 +56,7 @@ pub struct Road {
     /// attribute is missing, RHT is assumed.
     pub rule: Option<Rule>,
     pub link: Option<Link>,
-    pub r#type: Vec<Type>,
+    pub r#type: Vec<RoadType>,
     pub plan_view: PlanView,
     pub elevation_profile: Option<ElevationProfile>,
     pub lateral_profile: Option<LateralProfile>,
@@ -145,7 +153,7 @@ where
         match_child_eq_ignore_ascii_case!(
             read,
             "link" => Link => |v| link = Some(v),
-            "type" => Type => |v| r#type.push(v),
+            "type" => RoadType => |v| r#type.push(v),
             "planView" true => PlanView => |v| plan_view = Some(v),
             "elevationProfile" => ElevationProfile => |v| elevation_profile = Some(v),
             "lateralProfile" => LateralProfile => |v| lateral_profile = Some(v),
@@ -202,167 +210,3 @@ impl arbitrary::Arbitrary<'_> for Road {
         })
     }
 }
-
-/// Follows the road header if the road is linked to a successor or a predecessor. Isolated roads
-/// may omit this element.
-#[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub struct Link {
-    pub predecessor: Option<PredecessorSuccessor>,
-    pub successor: Option<PredecessorSuccessor>,
-    // TODO pub additional_data: Vec<AdditionalData>,
-}
-impl Link {
-    pub fn visit_attributes(
-        &self,
-        visitor: impl for<'b> FnOnce(
-            Cow<'b, [xml::attribute::Attribute<'b>]>,
-        ) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        visit_attributes!(visitor)
-    }
-
-    pub fn visit_children(
-        &self,
-        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        if let Some(predecessor) = &self.predecessor {
-            visit_children!(visitor, "predecessor" => predecessor);
-        }
-
-        if let Some(successor) = &self.successor {
-            visit_children!(visitor, "successor" => successor);
-        }
-
-        Ok(())
-    }
-}
-
-impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for Link
-where
-    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
-{
-    type Error = crate::parser::Error;
-
-    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        let mut predecessor = None;
-        let mut successor = None;
-
-        match_child_eq_ignore_ascii_case!(
-            read,
-            "predecessor" => PredecessorSuccessor => |v| predecessor = Some(v),
-            "successor" => PredecessorSuccessor => |v| successor = Some(v),
-        );
-
-        Ok(Self {
-            predecessor,
-            successor,
-        })
-    }
-}
-
-/// Successors and predecessors can be junctions or roads. For each, different attribute sets shall
-/// be used.
-#[derive(Debug, Clone, PartialEq)]
-pub struct PredecessorSuccessor {
-    /// Contact point of link on the linked element
-    pub contact_point: Option<ContactPoint>,
-    /// To be provided when elementS is used for the connection definition. Indicates the direction
-    /// on the predecessor from which the road is entered.
-    pub element_dir: Option<ElementDir>,
-    /// ID of the linked element
-    pub element_id: String,
-    /// Alternative to contactPoint for virtual junctions. Indicates a connection within the
-    /// predecessor, meaning not at the start or end of the predecessor. Shall only be used for
-    /// elementType "road"
-    pub element_s: Option<Length>,
-    /// Type of the linked element
-    pub element_type: Option<ElementType>,
-}
-
-impl PredecessorSuccessor {
-    pub fn visit_attributes(
-        &self,
-        visitor: impl for<'b> FnOnce(
-            Cow<'b, [xml::attribute::Attribute<'b>]>,
-        ) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        visit_attributes_flatten!(
-            visitor,
-            "contactPoint" => self.contact_point.as_ref().map(ContactPoint::as_str),
-            "elementDir" => self.element_dir.as_ref().map(ElementDir::as_str),
-            "elementId" => Some(self.element_id.as_str()),
-            "elementS" => self.element_s.map(|v| v.value.to_scientific_string()).as_deref(),
-            "elementType" => self.element_type.as_ref().map(ElementType::as_str),
-        )
-    }
-
-    pub fn visit_children(
-        &self,
-        mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
-    ) -> xml::writer::Result<()> {
-        visit_children!(visitor);
-        Ok(())
-    }
-}
-
-impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for PredecessorSuccessor
-where
-    I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
-{
-    type Error = crate::parser::Error;
-
-    fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
-        read.expecting_no_child_elements_for(Self {
-            contact_point: read.attribute_opt("contactPoint")?,
-            element_dir: read.attribute_opt("elementDir")?,
-            element_id: read.attribute("elementId")?,
-            element_s: read.attribute_opt("elementS")?.map(Length::new::<meter>),
-            element_type: read.attribute_opt("elementType")?,
-        })
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl arbitrary::Arbitrary<'_> for PredecessorSuccessor {
-    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
-        use crate::fuzzing::NotNan;
-        Ok(Self {
-            contact_point: u.arbitrary()?,
-            element_dir: u.arbitrary()?,
-            element_id: u.arbitrary()?,
-            element_s: if u.arbitrary()? {
-                Some(Length::new::<meter>(u.not_nan_f64()?))
-            } else {
-                None
-            },
-            element_type: u.arbitrary()?,
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum ElementType {
-    Road,
-    Junction,
-}
-
-impl_from_str_as_str!(
-    ElementType,
-    "road" => Road,
-    "junction" => Junction,
-);
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum Rule {
-    RightHandTraffic,
-    LeftHandTraffic,
-}
-
-impl_from_str_as_str!(
-    Rule,
-    "RHT" => RightHandTraffic,
-    "LHT" => LeftHandTraffic,
-);
