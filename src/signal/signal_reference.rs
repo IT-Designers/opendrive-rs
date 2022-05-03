@@ -1,3 +1,4 @@
+use crate::core::additional_data::AdditionalData;
 use crate::object::lane_validity::LaneValidity;
 use crate::object::orientation::Orientation;
 use std::borrow::Cow;
@@ -20,6 +21,7 @@ pub struct SignalReference {
     pub s: Length,
     /// t-coordinate
     pub t: Length,
+    pub additional_data: AdditionalData,
 }
 
 impl SignalReference {
@@ -45,7 +47,8 @@ impl SignalReference {
         for validity in &self.validity {
             visit_children!(visitor, "validity" => validity);
         }
-        Ok(())
+
+        self.additional_data.append_children(visitor)
     }
 }
 
@@ -57,10 +60,12 @@ where
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut validity = Vec::new();
+        let mut additional_data = AdditionalData::default();
 
         match_child_eq_ignore_ascii_case!(
             read,
             "validity" => LaneValidity => |v| validity.push(v),
+            _ => |_name, context| additional_data.fill(context),
         );
 
         Ok(Self {
@@ -69,6 +74,7 @@ where
             orientation: read.attribute("orientation")?,
             s: Length::new::<meter>(read.attribute("s")?),
             t: Length::new::<meter>(read.attribute("t")?),
+            additional_data,
         })
     }
 }
@@ -83,6 +89,7 @@ impl arbitrary::Arbitrary<'_> for SignalReference {
             orientation: u.arbitrary()?,
             s: Length::new::<meter>(u.not_nan_f64()?),
             t: Length::new::<meter>(u.not_nan_f64()?),
+            additional_data: u.arbitrary()?,
         })
     }
 }

@@ -7,7 +7,6 @@ use uom::si::f64::Curvature;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Arc {
     /// Constant curvature throughout the element
-    // https://github.com/RReverser/serde-xml-rs/issues/137
     pub curvature: Curvature,
 }
 
@@ -52,8 +51,6 @@ where
 impl arbitrary::Arbitrary<'_> for Arc {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         use crate::fuzzing::NotNan;
-        use uom::si::curvature::radian_per_meter;
-        use uom::si::f64::Curvature;
         Ok(Self {
             curvature: Curvature::new::<radian_per_meter>(u.not_nan_f64()?),
         })

@@ -5,7 +5,7 @@ use crate::railroad::Railroad;
 use crate::road::profile::ElevationProfile;
 use crate::road::road_type::RoadType;
 use crate::road::surface::Surface;
-use crate::signal::Signals;
+use crate::signal::signals::Signals;
 use geometry::plan_view::PlanView;
 use link::Link;
 use profile::lateral_profile::LateralProfile;

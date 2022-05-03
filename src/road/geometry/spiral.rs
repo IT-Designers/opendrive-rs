@@ -59,7 +59,6 @@ where
 impl arbitrary::Arbitrary<'_> for Spiral {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         use crate::fuzzing::NotNan;
-        use uom::si::curvature::radian_per_meter;
         Ok(Self {
             curvature_start: Curvature::new::<radian_per_meter>(u.not_nan_f64()?),
             curvature_end: Curvature::new::<radian_per_meter>(u.not_nan_f64()?),
