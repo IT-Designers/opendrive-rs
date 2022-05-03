@@ -2,18 +2,14 @@
 
 use libfuzzer_sys::fuzz_target;
 use opendrive::core::OpenDrive;
-use opendrive::xml::EventReader;
 
 fuzz_target!(|data: OpenDrive| {
-    let writer = data.to_writer().unwrap();
-    let bytes = writer.into_inner();
+    let string = data.to_xml_string().unwrap();
+    let data_2 = OpenDrive::from_xml_str(&string);
 
-    let reader = EventReader::from_str(core::str::from_utf8(&bytes).unwrap());
-    let data_2 = OpenDrive::from_reader(reader);
-
-    if data_2.is_err() {
-        eprintln!("{}", data_2.as_ref().unwrap_err());
-        dbg!(core::str::from_utf8(&bytes).unwrap());
+    if let Err(e) = &data_2 {
+        eprintln!("{e}");
+        dbg!(&string);
     }
 
     let data_2 = data_2.unwrap();

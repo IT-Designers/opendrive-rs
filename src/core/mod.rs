@@ -33,6 +33,16 @@ pub struct OpenDrive {
 }
 
 impl OpenDrive {
+    #[inline]
+    pub fn from_xml_str(s: &str) -> Result<Self, crate::parser::Error> {
+        Self::from_reader(EventReader::from_str(s))
+    }
+
+    #[inline]
+    pub fn from_xml_read<T: std::io::Read>(r: T) -> Result<Self, crate::parser::Error> {
+        Self::from_reader(EventReader::new(r))
+    }
+
     pub fn from_reader<T: std::io::Read>(
         reader: EventReader<T>,
     ) -> Result<Self, crate::parser::Error> {
@@ -53,6 +63,18 @@ impl OpenDrive {
         let mut writer = EventWriter::new(Vec::new());
         self.append_to_writer(&mut writer)?;
         Ok(writer)
+    }
+
+    #[inline]
+    pub fn to_xml_string(&self) -> Result<String, crate::writer::Error> {
+        Ok(String::from_utf8(self.to_writer()?.into_inner())?)
+    }
+
+    #[inline]
+    pub fn to_xml_write(&self, w: impl std::io::Write) -> Result<(), crate::writer::Error> {
+        let mut writer = EventWriter::new(w);
+        self.append_to_writer(&mut writer)?;
+        Ok(())
     }
 
     pub fn append_to_writer<'b, T: std::io::Write + 'b>(
@@ -114,7 +136,6 @@ impl OpenDrive {
         self.additional_data.append_children(visitor)
     }
 }
-
 impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for OpenDrive
 where
     I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,

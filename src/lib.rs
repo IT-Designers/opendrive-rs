@@ -1,5 +1,6 @@
 #[macro_use]
 pub mod parser;
+pub mod writer;
 
 pub mod core;
 pub mod junction;
@@ -12,12 +13,9 @@ pub mod signal;
 #[cfg(feature = "fuzzing")]
 pub mod fuzzing;
 
-pub use xml;
-
 #[cfg(test)]
 mod tests {
     use crate::core::OpenDrive;
-    use xml::EventReader;
 
     #[test]
     pub fn test_xml() {
@@ -28,7 +26,7 @@ mod tests {
                     </header>
                 </OpenDRIVE>
             "#;
-        let _ = OpenDrive::from_reader(EventReader::from_str(source)).unwrap();
+        let _ = OpenDrive::from_xml_str(source).unwrap();
     }
 
     #[test]
@@ -60,7 +58,7 @@ mod tests {
                     </road>
                 </OpenDRIVE>
             "#;
-        let _ = OpenDrive::from_reader(EventReader::from_str(source)).unwrap();
+        let _ = OpenDrive::from_xml_str(source).unwrap();
     }
 
     #[test]
@@ -92,6 +90,6 @@ mod tests {
                     </road>
                 </OpenDRIVE>
             "#;
-        let _ = OpenDrive::from_reader(EventReader::from_str(source)).unwrap();
+        let _ = OpenDrive::from_xml_str(source).unwrap();
     }
 }
