@@ -457,7 +457,7 @@ impl ParamPoly3 {
             "cV" => &self.c_v.to_scientific_string(),
             "dU" => &self.d_u.to_scientific_string(),
             "dV" => &self.d_v.to_scientific_string(),
-            "pRange" => &self.p_range.as_str(),
+            "pRange" => self.p_range.as_str(),
         )
     }
 
