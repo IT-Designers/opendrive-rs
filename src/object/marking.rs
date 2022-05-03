@@ -102,8 +102,6 @@ where
 impl arbitrary::Arbitrary<'_> for Marking {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         use crate::fuzzing::NotNan;
-        use uom::si::f64::Length;
-        use uom::si::length::meter;
         Ok(Self {
             corner_reference: u.arbitrary()?,
             color: u.arbitrary()?,

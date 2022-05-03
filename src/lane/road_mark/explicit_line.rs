@@ -67,8 +67,6 @@ where
 impl arbitrary::Arbitrary<'_> for ExplicitLine {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         use crate::fuzzing::NotNan;
-        use uom::si::f64::Length;
-        use uom::si::length::meter;
         Ok(Self {
             length: Length::new::<meter>(u.not_nan_f64()?),
             rule: u.arbitrary()?,

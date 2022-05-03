@@ -64,8 +64,6 @@ where
 impl arbitrary::Arbitrary<'_> for CornerRoad {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         use crate::fuzzing::NotNan;
-        use uom::si::f64::Length;
-        use uom::si::length::meter;
         Ok(Self {
             dz: Length::new::<meter>(u.not_nan_f64()?),
             height: Length::new::<meter>(u.not_nan_f64()?),
