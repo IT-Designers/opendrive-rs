@@ -48,7 +48,7 @@ impl Crg {
         visit_attributes_flatten!(
             visitor,
             "file" => Some(self.file.as_str()),
-            "h_offset" => self.h_offset.map(|v| v.value.to_scientific_string()).as_deref(),
+            "hOffset" => self.h_offset.map(|v| v.value.to_scientific_string()).as_deref(),
             "mode" => Some(self.mode.as_str()),
             "orientation" => Some(self.orientation.as_str()),
             "purpose" => self.purpose.as_ref().map(CrgPurpose::as_str),
