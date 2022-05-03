@@ -64,7 +64,6 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Element {
     pub name: String,
     pub attributes: HashMap<String, String>,
@@ -121,6 +120,28 @@ where
                 .map(|a| (a.name.local_name.to_string(), a.value.clone()))
                 .collect(),
             children,
+        })
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl arbitrary::Arbitrary<'_> for Element {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        use crate::fuzzing::ArbitraryStrings;
+        Ok(Self {
+            name: u.arbitrary_string(1..=10, &['a'..='z', 'A'..='Z'])?,
+            attributes: (0..u.arbitrary_len::<HashMap<String, String>>()?)
+                .into_iter()
+                .map(|_| {
+                    (|| {
+                        Ok((
+                            u.arbitrary_string(1..=10, &['a'..='z', 'A'..='Z'])?,
+                            u.arbitrary_string(1..=10, &['a'..='z', 'A'..='Z'])?,
+                        ))
+                    })()
+                })
+                .collect::<Result<HashMap<_, _>, _>>()?,
+            children: u.arbitrary()?,
         })
     }
 }
