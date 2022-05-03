@@ -1,12 +1,12 @@
 use crate::object::lane_validity::LaneValidity;
 use crate::object::orientation::Orientation;
 use crate::road::country_code::CountryCode;
-use crate::road::signals::dependency::Dependency;
-use crate::road::signals::position::PositionChoice;
-use crate::road::signals::position::PositionInertial;
-use crate::road::signals::position::PositionRoad;
-use crate::road::signals::reference::Reference;
 use crate::road::unit::Unit;
+use crate::signal::dependency::Dependency;
+use crate::signal::position::PositionChoice;
+use crate::signal::position::PositionInertial;
+use crate::signal::position::PositionRoad;
+use crate::signal::reference::Reference;
 use std::borrow::Cow;
 use uom::si::angle::radian;
 use uom::si::f64::{Angle, Length};

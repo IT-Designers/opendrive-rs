@@ -3,8 +3,8 @@ use crate::core::header::Header;
 use crate::junction::junction_group::JunctionGroup;
 use crate::junction::Junction;
 use crate::railroad::station::Station;
-use crate::road::signals::controller::Controller;
 use crate::road::Road;
+use crate::signal::controller::Controller;
 use std::borrow::Cow;
 use xml::{EventReader, EventWriter};
 

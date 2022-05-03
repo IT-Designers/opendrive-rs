@@ -1,5 +1,5 @@
-use crate::road::signals::signal::Signal;
-use crate::road::signals::signal_reference::SignalReference;
+use crate::signal::signal::Signal;
+use crate::signal::signal_reference::SignalReference;
 use std::borrow::Cow;
 
 pub mod controller;

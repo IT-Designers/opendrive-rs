@@ -7,6 +7,7 @@ pub mod lane;
 pub mod object;
 pub mod railroad;
 pub mod road;
+pub mod signal;
 
 #[cfg(feature = "fuzzing")]
 pub mod fuzzing;
