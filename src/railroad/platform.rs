@@ -1,4 +1,5 @@
-use crate::road::railroad::segment::Segment;
+use crate::core::additional_data::AdditionalData;
+use crate::railroad::segment::Segment;
 use std::borrow::Cow;
 use vec1::Vec1;
 
@@ -11,6 +12,7 @@ pub struct Platform {
     pub id: String,
     /// Name of the platform. May be chosen freely.
     pub name: Option<String>,
+    pub additional_data: AdditionalData,
 }
 
 impl Platform {
@@ -34,7 +36,8 @@ impl Platform {
         for segment in &self.segment {
             visit_children!(visitor, "segment" => segment);
         }
-        Ok(())
+
+        self.additional_data.append_children(visitor)
     }
 }
 
@@ -46,16 +49,19 @@ where
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut segment = Vec::new();
+        let mut additional_data = AdditionalData::default();
 
         match_child_eq_ignore_ascii_case!(
             read,
             "segment" true => Segment => |v| segment.push(v),
+            _ => |_name, context| additional_data.fill(context),
         );
 
         Ok(Self {
             segment: Vec1::try_from_vec(segment).unwrap(),
             id: read.attribute("id")?,
             name: read.attribute_opt("name")?,
+            additional_data,
         })
     }
 }
@@ -71,6 +77,7 @@ impl arbitrary::Arbitrary<'_> for Platform {
             },
             id: u.arbitrary()?,
             name: u.arbitrary()?,
+            additional_data: u.arbitrary()?,
         })
     }
 }

@@ -1,3 +1,4 @@
+use crate::railroad::segment_side::SegmentSide;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
@@ -69,16 +70,3 @@ impl arbitrary::Arbitrary<'_> for Segment {
         })
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum SegmentSide {
-    Left,
-    Right,
-}
-
-impl_from_str_as_str!(
-    SegmentSide,
-    "left" => Left,
-    "right" => Right,
-);

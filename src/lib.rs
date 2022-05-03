@@ -5,6 +5,7 @@ pub mod core;
 pub mod junction;
 pub mod lane;
 pub mod object;
+pub mod railroad;
 pub mod road;
 
 #[cfg(feature = "fuzzing")]

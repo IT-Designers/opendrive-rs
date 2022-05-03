@@ -1,4 +1,6 @@
-use crate::road::railroad::platform::Platform;
+use crate::core::additional_data::AdditionalData;
+use crate::railroad::platform::Platform;
+use crate::railroad::station_type::StationType;
 use std::borrow::Cow;
 use vec1::Vec1;
 
@@ -14,6 +16,7 @@ pub struct Station {
     /// Type of station. Free text, depending on the application.
     /// e.g.: small, medium, large
     pub r#type: Option<StationType>,
+    pub additional_data: AdditionalData,
 }
 
 impl Station {
@@ -38,7 +41,8 @@ impl Station {
         for platform in &self.platform {
             visit_children!(visitor, "platform" => platform);
         }
-        Ok(())
+
+        self.additional_data.append_children(visitor)
     }
 }
 
@@ -50,10 +54,12 @@ where
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut platform = Vec::new();
+        let mut additional_data = AdditionalData::default();
 
         match_child_eq_ignore_ascii_case!(
             read,
             "platform" true => Platform => |v| platform.push(v),
+            _ => |_name, context| additional_data.fill(context),
         );
 
         Ok(Self {
@@ -61,6 +67,7 @@ where
             id: read.attribute("id")?,
             name: read.attribute("name")?,
             r#type: read.attribute_opt("type")?,
+            additional_data,
         })
     }
 }
@@ -77,21 +84,7 @@ impl arbitrary::Arbitrary<'_> for Station {
             id: u.arbitrary()?,
             name: u.arbitrary()?,
             r#type: u.arbitrary()?,
+            additional_data: u.arbitrary()?,
         })
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub enum StationType {
-    Small,
-    Medium,
-    Large,
-}
-
-impl_from_str_as_str!(
-    StationType,
-    "small" => Small,
-    "medium" => Medium,
-    "large" => Large,
-);

@@ -2,7 +2,7 @@ use crate::core::additional_data::AdditionalData;
 use crate::core::header::Header;
 use crate::junction::junction_group::JunctionGroup;
 use crate::junction::Junction;
-use crate::road::railroad::station::Station;
+use crate::railroad::station::Station;
 use crate::road::signals::controller::Controller;
 use crate::road::Road;
 use std::borrow::Cow;
