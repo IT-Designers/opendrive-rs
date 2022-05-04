@@ -81,7 +81,12 @@ where
             c_v: read.attribute("cV")?,
             d_u: read.attribute("dU")?,
             d_v: read.attribute("dV")?,
-            p_range: read.attribute("pRange")?,
+            p_range: if cfg!(feature = "workaround-sumo-issue-10301") {
+                read.attribute_opt("pRange")?
+                    .unwrap_or(ParamPoly3pRange::Normalized)
+            } else {
+                read.attribute("pRange")?
+            },
         })
     }
 }

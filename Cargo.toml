@@ -21,3 +21,9 @@ arbitrary = { version = "1.1.0", optional = true, features = ["derive"] }
 
 [features]
 fuzzing = ["arbitrary"]
+workaround-sumo = ["workaround-sumo-issue-10301"]
+
+# SUMO ISSUE: `paramPoly3.pRange` missing in OpenDRIVE export
+# WORKAROUND: assume `ParamPoly3pRange::Normalized`
+# https://github.com/eclipse/sumo/issues/10301
+workaround-sumo-issue-10301 = []
