@@ -22,20 +22,17 @@ impl core::str::FromStr for CountryCode {
 
     #[allow(deprecated)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match CountryCodeDeprecated::from_str(s) {
-            Err(_) => {
-                if s.len() == 2 && s.chars().all(|c| c.is_ascii_alphabetic()) {
-                    Ok(Self::Iso3166alpha2(s.to_string()))
-                } else if s.len() == 3 && s.chars().all(|c| c.is_ascii_alphabetic()) {
-                    Ok(Self::Iso3166alpha3(s.to_string()))
-                } else {
-                    Err(crate::parser::InvalidEnumValue {
-                        r#type: core::any::type_name::<Self>().to_string(),
-                        value: s.to_string(),
-                    })
-                }
-            }
-            Ok(v) => Ok(Self::CountryCodeDeprecated(v)),
+        if s.len() == 2 && s.chars().all(|c| c.is_ascii_alphabetic()) {
+            Ok(Self::Iso3166alpha2(s.to_string()))
+        } else if s.len() == 3 && s.chars().all(|c| c.is_ascii_alphabetic()) {
+            Ok(Self::Iso3166alpha3(s.to_string()))
+        } else if let Ok(cc) = CountryCodeDeprecated::from_str(s) {
+            Ok(Self::CountryCodeDeprecated(cc))
+        } else {
+            Err(crate::parser::InvalidEnumValue {
+                r#type: core::any::type_name::<Self>().to_string(),
+                value: s.to_string(),
+            })
         }
     }
 }
@@ -71,7 +68,7 @@ pub enum CountryCodeDeprecated {
     Germany,
     Italy,
     Switzerland,
-    USA,
+    // USA, This has been removed, because it overlaps with Iso3166alpha3("USA")
 }
 
 impl_from_str_as_str!(
@@ -84,5 +81,5 @@ impl_from_str_as_str!(
     "Germany" => Germany,
     "Italy" => Italy,
     "Switzerland" => Switzerland,
-    "USA" => USA,
+    // "USA" => USA, This has been removed, because it overlaps with Iso3166alpha3("USA")
 );
