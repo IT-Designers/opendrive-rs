@@ -261,7 +261,9 @@ where
                 Ok(())
             });
         }
-        if cfg!(debug_assertions) {
+
+        #[cfg(debug_assertions)]
+        {
             let attributes = self
                 .attributes
                 .iter()
