@@ -31,7 +31,7 @@ pub struct Geometry {
     pub x: Length,
     /// Start position (y inertial)
     pub y: Length,
-    pub choice: GeometryType,
+    pub r#type: GeometryType,
     pub additional_data: AdditionalData,
 }
 
@@ -56,7 +56,7 @@ impl Geometry {
         &self,
         mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
-        match &self.choice {
+        match &self.r#type {
             GeometryType::Line(value) => visit_children!(visitor, "line" => value),
             GeometryType::Spiral(value) => visit_children!(visitor, "spiral" => value),
             GeometryType::Arc(value) => visit_children!(visitor, "arc" => value),
@@ -95,7 +95,7 @@ where
             s: read.attribute("s").map(Length::new::<meter>)?,
             x: read.attribute("x").map(Length::new::<meter>)?,
             y: read.attribute("y").map(Length::new::<meter>)?,
-            choice: choice.ok_or_else(|| {
+            r#type: choice.ok_or_else(|| {
                 crate::parser::Error::missing_element(
                     read.path().to_string(),
                     "line|spiral|arc|poly3|paramPoly3",
@@ -117,7 +117,7 @@ impl arbitrary::Arbitrary<'_> for Geometry {
             s: Length::new::<meter>(u.not_nan_f64()?),
             x: Length::new::<meter>(u.not_nan_f64()?),
             y: Length::new::<meter>(u.not_nan_f64()?),
-            choice: u.arbitrary()?,
+            r#type: u.arbitrary()?,
             additional_data: u.arbitrary()?,
         })
     }
