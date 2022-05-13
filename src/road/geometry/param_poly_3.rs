@@ -36,6 +36,16 @@ pub struct ParamPoly3 {
 }
 
 impl ParamPoly3 {
+    #[inline]
+    pub fn u(&self, p: f64) -> f64 {
+        self.a_u + (self.b_u * p) + (self.c_u * p * p) + (self.d_u * p * p * p)
+    }
+
+    #[inline]
+    pub fn v(&self, p: f64) -> f64 {
+        self.a_v + (self.b_v * p) + (self.c_v * p * p) + (self.d_v * p * p * p)
+    }
+
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(

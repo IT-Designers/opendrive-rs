@@ -19,6 +19,10 @@ pub struct Poly3 {
 }
 
 impl Poly3 {
+    pub fn v(&self, u: f64) -> f64 {
+        self.a + (self.b * u) + (self.c * u * u) + (self.d * u * u * u)
+    }
+
     pub fn visit_attributes(
         &self,
         visitor: impl for<'b> FnOnce(
