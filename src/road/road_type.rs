@@ -1,7 +1,7 @@
 use crate::core::additional_data::AdditionalData;
-use crate::lane::speed::Speed;
 use crate::road::country_code::CountryCode;
 use crate::road::road_type_e::RoadTypeE;
+use crate::road::speed::Speed;
 use std::borrow::Cow;
 use uom::si::f64::Length;
 use uom::si::length::meter;
