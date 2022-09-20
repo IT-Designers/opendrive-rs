@@ -167,9 +167,18 @@ where
         Ok(())
     }
 
+    #[inline]
     pub fn children(
         &mut self,
+        mapper: impl for<'b> FnMut(&'b str, ReadContext<'_, I>) -> Result<(), Error>,
+    ) -> Result<(), Error> {
+        self.children_or_cdata(mapper, |_| Ok(()))
+    }
+
+    pub fn children_or_cdata(
+        &mut self,
         mut mapper: impl for<'b> FnMut(&'b str, ReadContext<'_, I>) -> Result<(), Error>,
+        mut cdata: impl for<'b> FnMut(String) -> Result<(), Error>,
     ) -> Result<(), Error> {
         while let Some(event) = self.iterator.next() {
             match event? {
@@ -205,7 +214,12 @@ where
                     self.children_done = true;
                     break;
                 }
-                _ => {}
+                xml::reader::XmlEvent::CData(data) => {
+                    cdata(data)?;
+                }
+                other => {
+                    drop(other);
+                }
             }
         }
         Ok(())

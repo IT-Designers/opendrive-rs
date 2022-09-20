@@ -13,6 +13,8 @@ use std::borrow::Cow;
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct GeoReference {
+    /// https://proj.org/usage/projections.html
+    pub proj: Option<String>,
     pub additional_data: AdditionalData,
 }
 
@@ -31,6 +33,11 @@ impl GeoReference {
         mut visitor: impl FnMut(xml::writer::XmlEvent) -> xml::writer::Result<()>,
     ) -> xml::writer::Result<()> {
         visit_children!(visitor);
+
+        if let Some(cdata) = self.proj.as_deref() {
+            visitor(xml::writer::XmlEvent::CData(cdata))?;
+        }
+
         self.additional_data.append_children(visitor)
     }
 }
@@ -43,9 +50,19 @@ where
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut additional_data = AdditionalData::default();
+        let mut proj = None;
 
-        read.children(|_name, context| additional_data.fill(context))?;
+        read.children_or_cdata(
+            |_name, context| additional_data.fill(context),
+            |cdata| {
+                proj = Some(cdata);
+                Ok(())
+            },
+        )?;
 
-        Ok(Self { additional_data })
+        Ok(Self {
+            proj,
+            additional_data,
+        })
     }
 }
