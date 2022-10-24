@@ -1,4 +1,5 @@
 use crate::core::additional_data::AdditionalData;
+use crate::lane::road_mark::color::Color;
 use crate::lane::road_mark::weight::Weight;
 use explicit::Explicit;
 use lane_change::LaneChange;
@@ -114,7 +115,11 @@ where
             sway,
             r#type,
             explicit,
-            color: read.attribute("color")?,
+            color: if cfg!(feature = "workaround-sumo-roadmark-missing-color") {
+                read.attribute_opt("color")?.unwrap_or(Color::Standard)
+            } else {
+                read.attribute("color")?
+            },
             height: read.attribute_opt("height")?.map(Length::new::<meter>),
             lane_change: read.attribute_opt("laneChange")?,
             material: read.attribute_opt("material")?,
