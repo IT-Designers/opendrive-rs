@@ -39,7 +39,7 @@ impl core::str::FromStr for Unit {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum DistanceUnit {
     Meter,
@@ -56,7 +56,7 @@ impl_from_str_as_str!(
     "mile" => Mile,
 );
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum SpeedUnit {
     KilometersPerHour,
@@ -71,7 +71,7 @@ impl_from_str_as_str!(
     "mph" => MilesPerHour,
 );
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum MassUnit {
     KiloGram,
@@ -84,7 +84,7 @@ impl_from_str_as_str!(
     "t" => Ton,
 );
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum SlopeUnit {
     Percentage,

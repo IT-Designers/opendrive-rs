@@ -1,6 +1,6 @@
 pub use allow_deprecated::ObjectType;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum Orientation {
     Plus,
@@ -17,7 +17,7 @@ impl_from_str_as_str!(
 
 #[allow(deprecated)]
 mod allow_deprecated {
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
     pub enum ObjectType {
         /// i.e. unknown

@@ -1,6 +1,6 @@
 /// The lane type is defined per lane. A lane type defines the main purpose of a lane and its
 /// corresponding traffic rules.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum LaneType {
     /// Describes a soft shoulder  at the edge of the roa

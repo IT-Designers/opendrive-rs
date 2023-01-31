@@ -1,5 +1,5 @@
 /// The known keywords for the road mark color information
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum RoadMarkColor {
     /// equivalent to "white"

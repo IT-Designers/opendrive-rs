@@ -1,5 +1,5 @@
 /// The known keywords for the simplified road mark type information
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum TypeSimplified {
     None,
