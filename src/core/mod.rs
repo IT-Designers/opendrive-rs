@@ -65,14 +65,14 @@ impl OpenDrive {
 
     #[inline]
     pub fn to_xml_string(&self) -> crate::writer::Result<String> {
-        Ok(String::from_utf8(
+        String::from_utf8(
             self.to_writer()
                 .map_err(crate::writer::Error::from)
                 .map_err(Box::new)?
                 .into_inner(),
         )
         .map_err(crate::writer::Error::from)
-        .map_err(Box::new)?)
+        .map_err(Box::new)
     }
 
     #[inline]
