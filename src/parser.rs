@@ -5,6 +5,8 @@ use std::num::{ParseFloatError, ParseIntError};
 use std::str::{FromStr, ParseBoolError};
 use xml::attribute::OwnedAttribute;
 
+pub type Result<T> = std::result::Result<T, Box<Error>>;
+
 #[derive(Debug, Copy, Clone)]
 pub struct Path<'a> {
     pub parent: Option<&'a Path<'a>>,
@@ -65,7 +67,7 @@ where
         self.path.name
     }
 
-    pub fn attribute<T: FromStr>(&self, name: &str) -> Result<T, Error>
+    pub fn attribute<T: FromStr>(&self, name: &str) -> Result<T>
     where
         T::Err: Into<ParseError>,
     {
@@ -75,24 +77,24 @@ where
             if attribute.name.local_name.eq_ignore_ascii_case(name) {
                 return match T::from_str(&attribute.value) {
                     Ok(v) => Ok(v),
-                    Err(e) => Err(Error::ParseError {
+                    Err(e) => Err(Box::new(Error::ParseError {
                         path: self.path.to_string(),
                         field: name.to_string(),
                         ty: core::any::type_name::<T>().to_string(),
                         error: e.into(),
                         bt: Box::new(Backtrace::new()),
-                    }),
+                    })),
                 };
             }
         }
-        Err(Error::missing_attribute(
+        Err(Box::new(Error::missing_attribute(
             self.path.to_string(),
             name,
             core::any::type_name::<T>(),
-        ))
+        )))
     }
 
-    pub fn attribute_opt<T: FromStr>(&self, name: &str) -> Result<Option<T>, Error>
+    pub fn attribute_opt<T: FromStr>(&self, name: &str) -> Result<Option<T>>
     where
         T::Err: Into<ParseError>,
     {
@@ -102,13 +104,13 @@ where
             if attribute.name.local_name.eq_ignore_ascii_case(name) {
                 return match T::from_str(&attribute.value) {
                     Ok(v) => Ok(Some(v)),
-                    Err(e) => Err(Error::ParseError {
+                    Err(e) => Err(Box::new(Error::ParseError {
                         path: self.path.to_string(),
                         field: name.to_string(),
                         ty: core::any::type_name::<T>().to_string(),
                         error: e.into(),
                         bt: Box::new(Backtrace::new()),
-                    }),
+                    })),
                 };
             }
         }
@@ -130,11 +132,11 @@ where
         &mut self,
         mapper: &mut [(
             &str,
-            &mut dyn for<'b> FnMut(&'b mut ReadContext<'_, I>) -> Result<(), Error>,
+            &mut dyn for<'b> FnMut(&'b mut ReadContext<'_, I>) -> Result<()>,
         )],
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         'outer: while let Some(event) = self.iterator.next() {
-            match event? {
+            match event.map_err(Error::from).map_err(Box::new)? {
                 xml::reader::XmlEvent::StartElement {
                     name,
                     attributes,
@@ -170,18 +172,18 @@ where
     #[inline]
     pub fn children(
         &mut self,
-        mapper: impl for<'b> FnMut(&'b str, ReadContext<'_, I>) -> Result<(), Error>,
-    ) -> Result<(), Error> {
+        mapper: impl for<'b> FnMut(&'b str, ReadContext<'_, I>) -> Result<()>,
+    ) -> Result<()> {
         self.children_or_cdata(mapper, |_| Ok(()))
     }
 
     pub fn children_or_cdata(
         &mut self,
-        mut mapper: impl for<'b> FnMut(&'b str, ReadContext<'_, I>) -> Result<(), Error>,
-        mut cdata: impl for<'b> FnMut(String) -> Result<(), Error>,
-    ) -> Result<(), Error> {
+        mut mapper: impl for<'b> FnMut(&'b str, ReadContext<'_, I>) -> Result<()>,
+        mut cdata: impl for<'b> FnMut(String) -> Result<()>,
+    ) -> Result<()> {
         while let Some(event) = self.iterator.next() {
-            match event? {
+            match event.map_err(Error::from).map_err(Box::new)? {
                 xml::reader::XmlEvent::StartElement {
                     name,
                     attributes,
@@ -226,7 +228,7 @@ where
     }
 
     #[inline]
-    pub fn expecting_no_child_elements(&mut self) -> Result<(), Error> {
+    pub fn expecting_no_child_elements(&mut self) -> Result<()> {
         self.children(|name, mut read| {
             dbg!(name);
             read.expecting_no_child_elements()
@@ -234,7 +236,7 @@ where
     }
 
     #[inline]
-    pub fn expecting_no_child_elements_for<T>(&mut self, value: T) -> Result<T, Error> {
+    pub fn expecting_no_child_elements_for<T>(&mut self, value: T) -> Result<T> {
         self.children(|_name, mut read| {
             dbg!(read.path().to_string());
             read.expecting_no_child_elements()
@@ -448,14 +450,18 @@ macro_rules! find_map_parse_attr {
             .map(|a| {
                 a.value
                     .parse::<$ty>()
-                    .map_err(|e| $crate::parser::Error::from(($name, stringify!($ty), e)))
+                    .map_err(|e| Box::new($crate::parser::Error::from(($name, stringify!($ty), e))))
             })
             .transpose()
     };
     ($attrs:ident, $name:literal, $ty:ty) => {
         find_map_parse_attr!($attrs, $name, Option<$ty>).and_then(|v| {
             v.ok_or_else(|| {
-                $crate::parser::Error::missing_attribute("<unknown>", $name, stringify!($ty))
+                Box::new($crate::parser::Error::missing_attribute(
+                    "<unknown>",
+                    $name,
+                    stringify!($ty),
+                ))
             })
         })
     };
@@ -477,7 +483,7 @@ macro_rules! find_map_parse_elem {
         ];
 
         while let Some(event) = $events.next() {
-            match event? {
+            match event.map_err($crate::parser::Error::from).map_err(Box::new)? {
                 xml::reader::XmlEvent::StartElement {
                     name,
                     attributes,
@@ -486,7 +492,7 @@ macro_rules! find_map_parse_elem {
                     let mut __index = 1;
                     $(
                         if name.local_name == $name {
-                            let v: Result<(), $crate::parser::Error> = $body(attributes);
+                            let v: $crate::parser::Result<()> = $body(attributes);
                             v?;
                             __fields[__index] = false;
                             continue;
@@ -498,7 +504,7 @@ macro_rules! find_map_parse_elem {
                     dbg!(&name.local_name, &attributes);
                     let mut depth = 1_usize;
                     while let Some(event) = $events.next() {
-                        match event? {
+                        match event.map_err($crate::parser::Error::from).map_err(Box::new)? {
                             xml::reader::XmlEvent::StartElement { .. } => depth += 1,
                             xml::reader::XmlEvent::EndElement { .. } => {
                                 depth -= 1;
@@ -513,7 +519,7 @@ macro_rules! find_map_parse_elem {
                 xml::reader::XmlEvent::EndElement { .. } => break,
                 _event => {
                     $(
-                        let v: Result<(), $crate::parser::Error> = $alt(_event);
+                        let v: $crate::parser::Result<()> = $alt(_event);
                         v?;
                     )?
                 }
@@ -526,11 +532,11 @@ macro_rules! find_map_parse_elem {
             if __fields[__index] {
                 $(
                     let _: bool = $req;
-                    return Err($crate::parser::Error::missing_element(
+                    return Err(Box::new($crate::parser::Error::missing_element(
                         "<unknown>",
                         $name,
                         stringify!($body)
-                    ));
+                    )));
                 )?
             }
             __index += 1;
@@ -566,7 +572,7 @@ macro_rules! match_child_eq_ignore_ascii_case {
                     },
                 )*
                 _ => {
-                    let v: Result<(), $crate::parser::Error> = Ok(());
+                    let v: $crate::parser::Result<()> = Ok(());
                     $(
                         let v = v.and_then(|_| $alt(name, context));
                     )?
@@ -580,11 +586,11 @@ macro_rules! match_child_eq_ignore_ascii_case {
                 paste::paste!{
                     if [<__is_missing_ $name>] {
                         let _: bool = $req;
-                        return Err($crate::parser::Error::missing_element(
+                        return Err(Box::new($crate::parser::Error::missing_element(
                             $context.path().to_string(),
                             $name,
                             stringify!($ty),
-                        ));
+                        )));
                     };
                 }
             )?

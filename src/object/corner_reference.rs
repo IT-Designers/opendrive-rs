@@ -14,7 +14,7 @@ impl CornerReference {
     pub fn from_events(
         events: &mut impl Iterator<Item = xml::reader::Result<XmlEvent>>,
         attributes: Vec<OwnedAttribute>,
-    ) -> Result<Self, crate::parser::Error> {
+    ) -> crate::parser::Result<Self> {
         find_map_parse_elem!(events);
 
         Ok(Self {
@@ -47,7 +47,7 @@ impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for CornerReference
 where
     I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
 {
-    type Error = crate::parser::Error;
+    type Error = Box<crate::parser::Error>;
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         read.expecting_no_child_elements_for(Self {

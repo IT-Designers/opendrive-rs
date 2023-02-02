@@ -33,10 +33,7 @@ impl AdditionalData {
         Ok(())
     }
 
-    pub fn fill<I>(
-        &mut self,
-        read: crate::parser::ReadContext<I>,
-    ) -> Result<(), crate::parser::Error>
+    pub fn fill<I>(&mut self, read: crate::parser::ReadContext<I>) -> crate::parser::Result<()>
     where
         I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
     {
@@ -51,10 +48,10 @@ impl AdditionalData {
                 self.user_data.push(UserData::try_from(read)?)
             }
             name => {
-                return Err(crate::parser::Error::InvalidValueFor {
+                return Err(Box::new(crate::parser::Error::InvalidValueFor {
                     name: core::any::type_name::<Self>().to_string(),
                     value: name.to_string(),
-                });
+                }));
             }
         };
         Ok(())

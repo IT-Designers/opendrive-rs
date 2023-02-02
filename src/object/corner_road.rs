@@ -47,7 +47,7 @@ impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for CornerRoad
 where
     I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
 {
-    type Error = crate::parser::Error;
+    type Error = Box<crate::parser::Error>;
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         read.expecting_no_child_elements_for(Self {

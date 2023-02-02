@@ -34,18 +34,16 @@ pub struct OpenDrive {
 
 impl OpenDrive {
     #[inline]
-    pub fn from_xml_str(s: &str) -> Result<Self, crate::parser::Error> {
+    pub fn from_xml_str(s: &str) -> crate::parser::Result<Self> {
         Self::from_reader(EventReader::from_str(s))
     }
 
     #[inline]
-    pub fn from_xml_read<T: std::io::Read>(r: T) -> Result<Self, crate::parser::Error> {
+    pub fn from_xml_read<T: std::io::Read>(r: T) -> crate::parser::Result<Self> {
         Self::from_reader(EventReader::new(r))
     }
 
-    pub fn from_reader<T: std::io::Read>(
-        reader: EventReader<T>,
-    ) -> Result<Self, crate::parser::Error> {
+    pub fn from_reader<T: std::io::Read>(reader: EventReader<T>) -> crate::parser::Result<Self> {
         let mut events = reader.into_iter();
         let mut drive = None;
 
@@ -66,14 +64,23 @@ impl OpenDrive {
     }
 
     #[inline]
-    pub fn to_xml_string(&self) -> Result<String, crate::writer::Error> {
-        Ok(String::from_utf8(self.to_writer()?.into_inner())?)
+    pub fn to_xml_string(&self) -> crate::writer::Result<String> {
+        Ok(String::from_utf8(
+            self.to_writer()
+                .map_err(crate::writer::Error::from)
+                .map_err(Box::new)?
+                .into_inner(),
+        )
+        .map_err(crate::writer::Error::from)
+        .map_err(Box::new)?)
     }
 
     #[inline]
-    pub fn to_xml_write(&self, w: impl std::io::Write) -> Result<(), crate::writer::Error> {
+    pub fn to_xml_write(&self, w: impl std::io::Write) -> crate::writer::Result<()> {
         let mut writer = EventWriter::new(w);
-        self.append_to_writer(&mut writer)?;
+        self.append_to_writer(&mut writer)
+            .map_err(crate::writer::Error::from)
+            .map_err(Box::new)?;
         Ok(())
     }
 
@@ -140,7 +147,7 @@ impl<'a, I> TryFrom<crate::parser::ReadContext<'a, I>> for OpenDrive
 where
     I: Iterator<Item = xml::reader::Result<xml::reader::XmlEvent>>,
 {
-    type Error = crate::parser::Error;
+    type Error = Box<crate::parser::Error>;
 
     fn try_from(mut read: crate::parser::ReadContext<'a, I>) -> Result<Self, Self::Error> {
         let mut header = None;

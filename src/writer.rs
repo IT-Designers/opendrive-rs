@@ -1,3 +1,5 @@
+pub type Result<T> = std::result::Result<T, Box<Error>>;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("The written output is no valid UTF8-String: {0}")]
