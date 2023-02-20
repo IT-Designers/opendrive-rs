@@ -15,7 +15,7 @@ readme = "README.md"
 
 [dependencies]
 url = { version = "2.2.2", features = ["serde"] }
-chrono = { version = "0.4.19", features = ["serde"] }
+chrono = { version = "0.4.22", features = ["serde"] }
 uom = { version = "0.32.0", features = ["serde", "f64"] }
 vec1 = "1.8.0"
 paste = "1.0.7"
