@@ -7,9 +7,9 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/itdesigners/opendrive-rs/issues/new)
 
 This crate provides data types for the [ASAM OpenDRIVE](https://www.asam.net/standards/detail/opendrive/) standard.
-Currently version `1.7.0` is supported. 
+Currently, version `1.7.0` is supported. 
 
-![preview](examples/preview.svg)
+See the [very basic example](examples/inout.rs) for a brief usage introductoin.
 
 ### cargo features
 
