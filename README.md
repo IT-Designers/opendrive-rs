@@ -20,3 +20,29 @@ See the [very basic example](examples/inout.rs) for a brief usage introductoin.
 
 This crate might or might not be developed further as the need for more API calls arise.
 That said, (small!) pull-requests are welcome. 
+
+# ASAM OpenDRIVE License
+
+The rustdoc documentation contains comments from the XML-Schemata definitions of the [ASAM OpenDRIVE](https://www.asam.net/standards/detail/opendrive/) standard and therefore might introduce further license restrictions.
+These XML-Schemata definitions contain the following file header:
+
+```
+ASAM OpenDRIVE V1.7.0
+
+© by ASAM e.V., 2021
+
+ASAM OpenDRIVE defines a file format for the precise analytical description of
+road networks
+
+
+Any use is limited to the scope described in the ASAM license terms.
+This file is distributable in accordance with the ASAM license terms.
+See www.asam.net/license.html for further details.
+```
+
+See also the additional [disclaimer](https://www.asam.net/index.php?eID=dumpFile&t=f&f=4422&token=e590561f3c39aa2260e5442e29e93f6693d1cccd):
+
+  * This document is the copyrighted property of ASAM e.V. In alteration to the
+    regular [license terms](https://www.asam.net/license), ASAM allows unrestricted distribution of this standard.
+    §2 (1) of ASAM’s regular [license terms](https://www.asam.net/license) is therefore substituted by the following clause:
+    "The licensor grants everyone a basic, non-exclusive and unlimited license to use the standard ASAM OpenDRIVE".
