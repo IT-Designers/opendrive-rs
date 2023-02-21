@@ -85,7 +85,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: fuzz
-          args: run fuzz_complete
+          args: run fuzz_complete -- -runs=90000
 
   fmt:
     name: Rustfmt
