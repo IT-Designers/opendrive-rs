@@ -421,7 +421,7 @@ pub trait ToScientificString {
 impl ToScientificString for f64 {
     fn to_scientific_string(&self) -> String {
         // TODO {:.17e+02} does not work
-        format!("{:.17e}", self)
+        format!("{self:.17e}")
     }
 }
 
