@@ -118,6 +118,7 @@ where
     }
 
     pub fn attributes(&self) -> impl Iterator<Item = &OwnedAttribute> {
+        #[allow(clippy::map_identity)] // because of debug assertions cfg flag
         self.attributes.iter().map(|a| {
             #[cfg(debug_assertions)]
             self.read_attributes
