@@ -9,7 +9,7 @@
 This crate provides data types for the [ASAM OpenDRIVE](https://www.asam.net/standards/detail/opendrive/) standard.
 Currently, version `1.7.0` is supported. 
 
-See the [very basic example](examples/inout.rs) for a brief usage introductoin.
+See the [very basic example](https://github.com/itdesigners/opendrive-rs/blob/master/examples/inout.rs) for a brief usage introductoin.
 
 ### cargo features
 
