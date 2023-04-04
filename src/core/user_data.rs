@@ -130,7 +130,6 @@ impl arbitrary::Arbitrary<'_> for Element {
         Ok(Self {
             name: u.arbitrary_string(1..=10, &['a'..='z', 'A'..='Z'])?,
             attributes: (0..u.arbitrary_len::<HashMap<String, String>>()?)
-                .into_iter()
                 .map(|_| {
                     (|| {
                         Ok((
