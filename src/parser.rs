@@ -562,7 +562,8 @@ macro_rules! match_child_eq_ignore_ascii_case {
                 $(
                     _ if $name.eq_ignore_ascii_case(name) => {
                         let v = <$ty as TryFrom<_>>::try_from(context)?;
-                        let _ = $consumer(v);
+                        let mut c = $consumer;
+                        let _ = c(v);
                         $(
                             paste::paste!{
                                 let _: bool = $req;
@@ -575,7 +576,8 @@ macro_rules! match_child_eq_ignore_ascii_case {
                 _ => {
                     let v: $crate::parser::Result<()> = Ok(());
                     $(
-                        let v = v.and_then(|_| $alt(name, context));
+                        let mut a = $alt;
+                        let v = v.and_then(|_| a(name, context));
                     )?
                     v
                 }
