@@ -271,7 +271,6 @@ where
 {
     fn drop(&mut self) {
         if !self.children_done {
-            dbg!(self.path().to_string());
             let _ = self.children(|name, ctx| {
                 // walk it by dropping it
                 let _ = (name, ctx);
@@ -281,6 +280,7 @@ where
 
         #[cfg(debug_assertions)]
         {
+            dbg!(self.path().to_string());
             let attributes = self
                 .attributes
                 .iter()

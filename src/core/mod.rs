@@ -35,7 +35,7 @@ pub struct OpenDrive {
 impl OpenDrive {
     #[inline]
     pub fn from_xml_str(s: &str) -> crate::parser::Result<Self> {
-        Self::from_reader(EventReader::from_str(s))
+        Self::from_reader(EventReader::from_str(s.trim()))
     }
 
     #[inline]
