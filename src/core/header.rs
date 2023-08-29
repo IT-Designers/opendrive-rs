@@ -173,7 +173,7 @@ impl Header {
     fn parse_date(date: &str) -> Option<DateTime<Utc>> {
         // this is the format used in all the ASAM examples ...
         if let Ok(date) = NaiveDateTime::parse_from_str(date, "%a %h %e %H:%M:%S %Y") {
-            Some(DateTime::<Utc>::from_utc(date, Utc))
+            Some(DateTime::from_naive_utc_and_offset(date, Utc))
         } else {
             DateTime::from_str(date).ok()
         }
